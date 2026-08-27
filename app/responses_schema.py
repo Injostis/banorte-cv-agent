@@ -141,12 +141,17 @@ def _build_output_items(final_text: str, tool_calls: list[ToolCallRecord]) -> li
         # part "resource" (convención EmbeddedResource de MCP) viaja aquí
         # dentro, no como un item aparte -- así el cliente lo encuentra
         # asociado a la llamada que lo produjo.
+        #
+        # `output` va como string JSON (no como objeto anidado): así es como
+        # lo espera un cliente que arma este campo serializando el resultado
+        # de la tool con json.dumps antes de guardarlo -- un objeto anidado
+        # ahí no sobrevive ese contrato.
         output.append(
             {
                 "id": f"fco_{uuid.uuid4().hex[:24]}",
                 "type": "function_call_output",
                 "call_id": call_id,
-                "output": call.output,
+                "output": json.dumps(call.output, ensure_ascii=False),
             }
         )
 

@@ -76,7 +76,9 @@ def test_build_response_function_call_output_shares_call_id_and_carries_result()
 
     call_item, output_item = response["output"][0], response["output"][1]
     assert output_item["call_id"] == call_item["call_id"]
-    assert output_item["output"] == {"nombre": "Rodrigo"}
+    # "output" va como string JSON, no como objeto anidado.
+    assert isinstance(output_item["output"], str)
+    assert json.loads(output_item["output"]) == {"nombre": "Rodrigo"}
 
 
 def test_build_response_adds_a2ui_resource_part_for_ps_trophies():
@@ -99,7 +101,7 @@ def test_build_response_adds_a2ui_resource_part_for_ps_trophies():
 
     output_item = response["output"][1]
     assert output_item["call_id"] == response["output"][0]["call_id"]
-    resource_part = output_item["output"]["content"][1]
+    resource_part = json.loads(output_item["output"])["content"][1]
     assert resource_part["type"] == "resource"
     assert resource_part["resource"]["mimeType"] == "application/a2ui+json"
     assert resource_part["resource"]["uri"] == "a2ui://banorte-cv-agent/ps_trophies"
@@ -182,5 +184,5 @@ def test_stream_response_events_includes_a2ui_resource_item():
     events = list(stream_response_events(model="claude-sonnet-5", final_text="Aquí están.", tool_calls=tool_calls))
     completed = json.loads(events[-2][len("data: ") :])
     output_item = next(item for item in completed["response"]["output"] if item["type"] == "function_call_output")
-    result_content_types = [part["type"] for part in output_item["output"]["content"]]
+    result_content_types = [part["type"] for part in json.loads(output_item["output"])["content"]]
     assert "resource" in result_content_types
