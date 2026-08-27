@@ -65,9 +65,18 @@ def test_build_response_includes_function_call_items_before_message():
     assert response["object"] == "response"
     assert response["status"] == "completed"
     types = [item["type"] for item in response["output"]]
-    assert types == ["function_call", "message"]
+    assert types == ["function_call", "function_call_output", "message"]
     assert response["output"][0]["name"] == "get_summary"
     assert response["output"][-1]["content"][0]["text"] == "Soy Rodrigo."
+
+
+def test_build_response_function_call_output_shares_call_id_and_carries_result():
+    tool_calls = [ToolCallRecord(name="get_summary", input={}, output={"nombre": "Rodrigo"})]
+    response = build_response(model="claude-sonnet-5", final_text="Soy Rodrigo.", tool_calls=tool_calls)
+
+    call_item, output_item = response["output"][0], response["output"][1]
+    assert output_item["call_id"] == call_item["call_id"]
+    assert output_item["output"] == {"nombre": "Rodrigo"}
 
 
 def test_build_response_adds_a2ui_resource_part_for_ps_trophies():
@@ -79,18 +88,22 @@ def test_build_response_adds_a2ui_resource_part_for_ps_trophies():
 
     response = build_response(model="claude-sonnet-5", final_text="Tengo varios platinos.", tool_calls=tool_calls)
 
-    # El "resource" de A2UI sale justo después de su function_call (no
-    # anidado en el content del mensaje), y el mensaje final va al final.
+    # El resultado de la tool (con su "resource" de A2UI adentro) va en el
+    # function_call_output asociado a la llamada, no en un item aparte --
+    # así el cliente lo asocia con la tool call que lo produjo.
     types = [item["type"] for item in response["output"]]
-    assert types == ["function_call", "resource", "message"]
+    assert types == ["function_call", "function_call_output", "message"]
 
     message_item = response["output"][2]
     assert message_item["content"][0]["text"] == "Tengo varios platinos."
 
-    resource_item = response["output"][1]
-    assert resource_item["resource"]["mimeType"] == "application/a2ui+json"
-    assert resource_item["resource"]["uri"] == "a2ui://banorte-cv-agent/ps_trophies"
-    a2ui_messages = json.loads(resource_item["resource"]["text"])
+    output_item = response["output"][1]
+    assert output_item["call_id"] == response["output"][0]["call_id"]
+    resource_part = output_item["output"]["content"][1]
+    assert resource_part["type"] == "resource"
+    assert resource_part["resource"]["mimeType"] == "application/a2ui+json"
+    assert resource_part["resource"]["uri"] == "a2ui://banorte-cv-agent/ps_trophies"
+    a2ui_messages = json.loads(resource_part["resource"]["text"])
     assert a2ui_messages[0]["createSurface"]["surfaceId"] == "ps_trophies"
     assert a2ui_messages[1]["updateComponents"]["surfaceId"] == "ps_trophies"
     assert a2ui_messages[2]["updateDataModel"]["surfaceId"] == "ps_trophies"
@@ -157,7 +170,7 @@ def test_stream_response_events_matches_build_response_content():
     completed = json.loads(events[-2][len("data: ") :])
     assert completed["response"]["status"] == "completed"
     types_in_output = [item["type"] for item in completed["response"]["output"]]
-    assert types_in_output == ["function_call", "message"]
+    assert types_in_output == ["function_call", "function_call_output", "message"]
     assert completed["response"]["output"][-1]["content"][0]["text"] == "Soy Rodrigo."
 
 
@@ -168,5 +181,6 @@ def test_stream_response_events_includes_a2ui_resource_item():
 
     events = list(stream_response_events(model="claude-sonnet-5", final_text="Aquí están.", tool_calls=tool_calls))
     completed = json.loads(events[-2][len("data: ") :])
-    types_in_output = [item["type"] for item in completed["response"]["output"]]
-    assert "resource" in types_in_output
+    output_item = next(item for item in completed["response"]["output"] if item["type"] == "function_call_output")
+    result_content_types = [part["type"] for part in output_item["output"]["content"]]
+    assert "resource" in result_content_types

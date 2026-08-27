@@ -63,7 +63,7 @@ def test_happy_path_returns_open_responses_shape(monkeypatch):
     assert body["object"] == "response"
     assert body["status"] == "completed"
     types = [item["type"] for item in body["output"]]
-    assert types == ["function_call", "message"]
+    assert types == ["function_call", "function_call_output", "message"]
     assert body["output"][-1]["content"][0]["text"] == "Trabajo en RYMA desde 2024."
 
 

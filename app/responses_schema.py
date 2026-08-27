@@ -121,26 +121,34 @@ def _build_output_items(final_text: str, tool_calls: list[ToolCallRecord]) -> li
     (stream_response_events), para no duplicar esta lógica dos veces."""
     output: list[dict[str, Any]] = []
     for call in tool_calls:
+        call_id = f"call_{uuid.uuid4().hex[:24]}"
         output.append(
             {
                 "id": f"fc_{uuid.uuid4().hex[:24]}",
                 "type": "function_call",
-                "call_id": f"call_{uuid.uuid4().hex[:24]}",
+                "call_id": call_id,
                 "name": call.name,
                 "arguments": json.dumps(call.input, ensure_ascii=False),
                 "status": "completed",
             }
         )
 
-        # Si la tool regresó un CallToolResult (una superficie A2UI, ver
-        # app/a2ui.py y app/tools.py), su content part "resource"
-        # (convención EmbeddedResource de MCP) se agrega como su propio
-        # item de "output", al mismo nivel que "message" y "function_call".
-        content = call.output.get("content")
-        if isinstance(content, list):
-            resource_part = next((p for p in content if isinstance(p, dict) and p.get("type") == "resource"), None)
-            if resource_part is not None:
-                output.append(resource_part)
+        # El resultado de la tool se manda como su propio item, referenciando
+        # el mismo call_id -- sin este item, un cliente no tiene forma de
+        # saber que la llamada ya terminó (se queda mostrándola como
+        # pendiente) ni de ver el resultado. Si la tool regresó un
+        # CallToolResult (una superficie A2UI, ver app/a2ui.py), su content
+        # part "resource" (convención EmbeddedResource de MCP) viaja aquí
+        # dentro, no como un item aparte -- así el cliente lo encuentra
+        # asociado a la llamada que lo produjo.
+        output.append(
+            {
+                "id": f"fco_{uuid.uuid4().hex[:24]}",
+                "type": "function_call_output",
+                "call_id": call_id,
+                "output": call.output,
+            }
+        )
 
     output.append(
         {
