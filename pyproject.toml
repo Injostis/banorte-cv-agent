@@ -1,0 +1,38 @@
+[project]
+name = "banorte-cv-agent"
+version = "0.1.0"
+description = "Agente de CV conversacional para el Reto IA Banorte, expuesto vía el contrato Open Responses."
+requires-python = ">=3.13"
+dependencies = [
+    "anthropic>=1.1.0",
+    "fastapi>=0.141.1",
+    "pydantic-settings>=2.15.0",
+    "pyyaml>=6.0.3",
+    "uvicorn[standard]>=0.52.4",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "mypy>=2.3.1",
+    "psnawp>=3.0.3",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "python-dotenv>=1.2.3",
+    "ruff>=0.16.4",
+    "types-pyyaml>=6.0.12.20260815",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.mypy]
+plugins = ["pydantic.mypy"]
+python_version = "3.13"

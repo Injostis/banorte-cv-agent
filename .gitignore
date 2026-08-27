@@ -1,0 +1,14 @@
+# Secretos — nunca subir esto a git
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Editor / OS
+.vscode/
+.DS_Store

@@ -1,0 +1,132 @@
+# Fuente de verdad del agente de CV.
+#
+# El agente NUNCA debe inventar datos fuera de este archivo. Cada tool en
+# app/tools.py lee de aquí y nada más. Si algo no está en este archivo,
+# la respuesta correcta del agente es "no tengo esa información en mi perfil",
+# no una suposición.
+
+nombre: "Rodrigo Antonio Rios de los Santos"
+titulo: "Ingeniero en Desarrollo de Software"
+
+contacto:
+  email: "rod06@hotmail.es"
+  ubicacion: "Monterrey, Nuevo León, México"
+  proyectos_publicos:
+    - nombre: "Muralea"
+      url: "muralea.com"
+
+resumen: >
+  Ingeniero en Desarrollo de Software egresado, con experiencia práctica en
+  desarrollo frontend usando Vue.js, TypeScript y React, complementada con
+  experiencia profesional en pruebas de software automatizadas. Desarrollador
+  de aplicaciones con IA generativa para facilitar y automatizar tareas en
+  distintos ámbitos, como arquitectura RAG y sistemas multiagente. Co-creador
+  y desarrollador frontend de Muralea, una plataforma de directorio en línea,
+  gratuita y activa, que conecta a negocios locales con clientes potenciales.
+  Experiencia en equipos Agile/Scrum, adaptable y comprometido con el
+  aprendizaje continuo.
+
+habilidades:
+  lenguajes_y_frameworks:
+    - JavaScript
+    - TypeScript
+    - React
+    - Vue.js
+    - Next.js
+    - Tailwind CSS
+    - HTML
+    - Python
+    - Java
+    - SQL
+    - Google Cloud Platform (GCP)
+    - Bases de datos vectoriales
+    - FastMCP
+    - FastAPI
+    - IA Generativa
+    - CI/CD
+    - REST
+    - LangChain
+  idiomas:
+    - idioma: Español
+      nivel: Nativo
+    - idioma: Inglés
+      nivel: "Avanzado (C1)"
+
+experiencia:
+  - puesto: "Asistente en Innovación Tecnológica y Facturación"
+    empresa: "Productos y Servicios RYMA S.A. de C.V."
+    periodo: "Enero 2024 – Presente"
+    responsabilidades:
+      - "Emisión y procesamiento de facturas con base en órdenes de compra confirmadas de clientes y notas de crédito."
+      - "Desarrollo y despliegue de un sistema multiagente (Agente RAG, Agente de Reportes, Agente de Correos) para automatizar tareas repetitivas, con observabilidad de costos vía Langfuse y guardrails para la seguridad del input y output."
+      - "Desarrollo de servidores MCP para el agente de Reportes y el de Correo."
+      - "Diseño y desarrollo de una aplicación móvil de control de inventario (React Native) para ayudar a la empresa a rastrear y organizar el stock del almacén, reemplazando bitácoras manuales en papel."
+      - "Mantenimiento continuo y actualización de la aplicación, mejorando usabilidad y precisión de datos con el tiempo, corriendo en la nube (GCP)."
+  - puesto: "Practicante de Ingeniero de Pruebas de Software"
+    empresa: "John Deere"
+    periodo: "Abril 2023 – Diciembre 2023"
+    responsabilidades:
+      - "Ejecución de pruebas manuales y automatizadas Software-in-the-Loop (SIL) y Hardware-in-the-Loop (HIL) para validar funciones electrónicas del vehículo, incluyendo la lógica de control de transmisión, bajo diversas condiciones de operación y falla."
+      - "Verificación de que los Códigos de Diagnóstico de Fallas (DTC) se generaran correctamente, simulando condiciones específicas de señal, como entradas de la palanca de cambios que producían señales de velocidad inválidas o fuera de rango."
+      - "Configuración y ejecución de escenarios de prueba automatizados usando herramientas de simulación para confirmar el comportamiento del sistema frente a los requisitos funcionales definidos."
+      - "Colaboración dentro de un equipo Scrum, participando en daily stand-ups y planificación de sprints para comunicar el avance de las historias de usuario asignadas."
+
+proyectos:
+  - nombre: "Muralea"
+    rol: "Cofundador, Frontend"
+    periodo: "2025 – Presente"
+    url: "muralea.com"
+    descripcion: >
+      Co-creación y lanzamiento de Muralea, una plataforma web tipo
+      directorio, gratuita, que conecta a negocios locales con clientes
+      potenciales. Desarrollo completo del frontend usando Vue 3
+      (Composition API), TypeScript y Tailwind CSS, logrando una interfaz de
+      usuario responsiva y accesible.
+    estado: "Activo y en producción."
+  - nombre: "Hackathon Cemex"
+    rol: "Desarrollador"
+    periodo: "Noviembre 2024"
+    descripcion: >
+      Creación de una aplicación web potenciada con IA generativa para la
+      venta de material de construcción, con un agente dedicado a generar
+      visualizaciones del material puesto en venta, auxiliando en el diseño
+      y ahorro de materiales de construcción.
+    estado: "Proyecto de hackathon."
+  - nombre: "Plataforma multiagente (RAG + Reportes + Correos)"
+    rol: "Desarrollador (proyecto personal)"
+    periodo: "2026 – Presente"
+    descripcion: >
+      Proyecto en el que ha estado trabajando por su cuenta desde hace
+      tiempo: un orquestador en LangGraph que enruta cada solicitud a un
+      agente especializado — un agente RAG sobre Postgres + pgvector
+      (embeddings con Voyage AI) para políticas internas, un agente de
+      Reportes y uno de Correos, ambos expuestos como servidores MCP.
+      Incluye guardrails de entrada/salida (Guardrails AI + validadores
+      propios) y observabilidad de costos y trazas con Langfuse. Backend en
+      FastAPI, UI de demo en Chainlit, todo contenedorizado con Docker.
+    estado: >
+      Aún no desplegado en producción. El plan es que, una vez terminado,
+      se use en la empresa de mi papá para automatizar tareas repetitivas
+      (consultas internas, reportes, correos).
+  - nombre: "Aplicación móvil de control de inventario"
+    rol: "Desarrollador (React Native)"
+    periodo: "2024 – Presente"
+    descripcion: >
+      Aplicación móvil para que RELMA (empresa hermana de RYMA dentro del
+      mismo negocio familiar -- en ese momento aún no estaban separadas)
+      rastree y organice el stock de su almacén, reemplazando bitácoras
+      manuales en papel. Desarrollada mientras trabajaba en RYMA. Desplegada
+      en GCP, con mantenimiento y mejoras continuas de usabilidad y
+      precisión de datos.
+    estado: "En uso interno en RELMA."
+
+educacion:
+  - titulo: "Ingeniero en Desarrollo de Software"
+    institucion: "Universidad TecMilenio"
+    periodo: "2020 – 2024"
+    ubicacion: "Monterrey, Nuevo León, México"
+
+certificados:
+  - "Programación de Videojuegos — Universidad TecMilenio"
+  - "Desarrollo de Aplicaciones Móviles — Universidad TecMilenio"
+  - "Desarrollo Web con Java — Universidad TecMilenio"
