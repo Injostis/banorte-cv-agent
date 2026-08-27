@@ -75,9 +75,13 @@ def test_build_response_adds_a2ui_part_for_ps_trophies():
 
     content = response["output"][-1]["content"]
     assert content[0]["type"] == "output_text"
+    # Cada mensaje A2UI va como su propia Part -- dos partes extra:
+    # createSurface y updateComponents, no una sola con ambos adentro.
+    assert len(content) == 3
     assert content[1]["kind"] == "data"
     assert content[1]["metadata"]["mimeType"] == "application/json+a2ui"
-    assert content[1]["data"]["messages"][0]["createSurface"]["surfaceId"] == "ps_trophies"
+    assert content[1]["data"]["createSurface"]["surfaceId"] == "ps_trophies"
+    assert content[2]["data"]["updateComponents"]["surfaceId"] == "ps_trophies"
 
 
 def test_build_response_no_a2ui_part_without_ps_trophies_tool():
