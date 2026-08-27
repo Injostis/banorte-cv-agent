@@ -67,9 +67,9 @@ def agent_card(request: Request) -> dict[str, Any]:
             "pushNotifications": False,
             "extensions": [
                 {
-                    "uri": "https://a2ui.org/a2a-extension/a2ui/v0.8",
+                    "uri": "https://a2ui.org/a2a-extension/a2ui/v1.0",
                     "description": "Puede incluir componentes A2UI en sus respuestas, siempre con respaldo de texto.",
-                    "required": False,
+                    "required": True,
                 }
             ],
         },
