@@ -115,10 +115,12 @@ def _respond(request: ResponsesRequest, *, final_text: str, tool_calls: list[Too
     ya usa Banorte hoy -- no cambia: sigue siendo exactamente build_response().
     """
     if request.stream:
+        logger.info("Respondiendo en modo STREAMING (request.stream=true).")
         return StreamingResponse(
             stream_response_events(model=settings.claude_model, final_text=final_text, tool_calls=tool_calls),
             media_type="text/event-stream",
         )
+    logger.info("Respondiendo en modo NO-streaming (request.stream=false o ausente).")
     return build_response(model=settings.claude_model, final_text=final_text, tool_calls=tool_calls)
 
 
