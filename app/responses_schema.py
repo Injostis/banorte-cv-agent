@@ -106,24 +106,28 @@ def build_response(*, model: str, final_text: str, tool_calls: list[ToolCallReco
                 "status": "completed",
             }
         )
-    content: list[dict[str, Any]] = [{"type": "output_text", "text": final_text, "annotations": []}]
-
-    ps_trophies_call = next((call for call in tool_calls if call.name == "get_ps_trophies"), None)
-    if ps_trophies_call is not None:
-        trofeos = ps_trophies_call.output.get("trofeos")
-        if isinstance(trofeos, list) and trofeos:
-            messages = build_ps_trophies_messages(trofeos)
-            content.append(wrap_as_a2a_data_part(messages))
-
     output.append(
         {
             "id": f"msg_{uuid.uuid4().hex[:24]}",
             "type": "message",
             "role": "assistant",
             "status": "completed",
-            "content": content,
+            "content": [{"type": "output_text", "text": final_text, "annotations": []}],
         }
     )
+
+    # La parte de A2UI va como su propio item de "output", al mismo nivel
+    # que "message" y "function_call" -- no anidada dentro del content del
+    # mensaje. Open Responses discrimina items por "type" y A2A discrimina
+    # Parts por "kind"; mezclar ambos esquemas dentro del mismo array de
+    # content era una hipótesis real de por qué no se detectaba.
+    ps_trophies_call = next((call for call in tool_calls if call.name == "get_ps_trophies"), None)
+    if ps_trophies_call is not None:
+        trofeos = ps_trophies_call.output.get("trofeos")
+        if isinstance(trofeos, list) and trofeos:
+            messages = build_ps_trophies_messages(trofeos)
+            output.append(wrap_as_a2a_data_part(messages))
+
     return {
         "id": f"resp_{uuid.uuid4().hex[:24]}",
         "object": "response",

@@ -73,15 +73,18 @@ def test_build_response_adds_a2ui_part_for_ps_trophies():
 
     response = build_response(model="claude-sonnet-5", final_text="Tengo varios platinos.", tool_calls=tool_calls)
 
-    content = response["output"][-1]["content"]
-    assert content[0]["type"] == "output_text"
-    # Una sola Part extra, con "data" como lista de los mensajes A2UI
-    # (createSurface + updateComponents) -- así lo pide el spec de la
-    # extensión A2A, no una Part por mensaje.
-    assert len(content) == 2
-    assert content[1]["kind"] == "data"
-    assert content[1]["metadata"]["mimeType"] == "application/a2ui+json"
-    a2ui_messages = content[1]["data"]
+    # La parte de A2UI va como su propio item de "output", después del
+    # mensaje de texto -- no anidada dentro de su content.
+    types = [item["type"] for item in response["output"]]
+    assert types == ["function_call", "message", "data"]
+
+    message_item = response["output"][1]
+    assert message_item["content"][0]["text"] == "Tengo varios platinos."
+
+    a2ui_item = response["output"][2]
+    assert a2ui_item["kind"] == "data"
+    assert a2ui_item["metadata"]["mimeType"] == "application/a2ui+json"
+    a2ui_messages = a2ui_item["data"]
     assert a2ui_messages[0]["createSurface"]["surfaceId"] == "ps_trophies"
     assert a2ui_messages[1]["updateComponents"]["surfaceId"] == "ps_trophies"
 
