@@ -16,7 +16,7 @@ from typing import Any
 from anthropic.types import ImageBlockParam, MessageParam, TextBlockParam
 from pydantic import BaseModel, ConfigDict
 
-from app.a2ui import build_ps_trophies_messages, wrap_as_a2a_data_part
+from app.a2ui import build_ps_trophies_tool_result
 from app.agent import ToolCallRecord
 from app.images import extract_image_urls, image_block_from_url
 
@@ -137,17 +137,17 @@ def build_response(*, model: str, final_text: str, tool_calls: list[ToolCallReco
         }
     )
 
-    # La parte de A2UI va como su propio item de "output", al mismo nivel
-    # que "message" y "function_call" -- no anidada dentro del content del
-    # mensaje. Open Responses discrimina items por "type" y A2A discrimina
-    # Parts por "kind"; mezclar ambos esquemas dentro del mismo array de
-    # content era una hipótesis real de por qué no se detectaba.
+    # El content part "resource" (convención EmbeddedResource de MCP) va
+    # como su propio item de "output", al mismo nivel que "message" y
+    # "function_call". El fallback en texto no se duplica aquí -- el
+    # mensaje final del agente ya cumple ese papel.
     ps_trophies_call = next((call for call in tool_calls if call.name == "get_ps_trophies"), None)
     if ps_trophies_call is not None:
         trofeos = ps_trophies_call.output.get("trofeos")
         if isinstance(trofeos, list) and trofeos:
-            messages = build_ps_trophies_messages(trofeos)
-            output.append(wrap_as_a2a_data_part(messages))
+            tool_result = build_ps_trophies_tool_result(trofeos)
+            resource_part = next(part for part in tool_result["content"] if part["type"] == "resource")
+            output.append(resource_part)
 
     return {
         "id": f"resp_{uuid.uuid4().hex[:24]}",

@@ -1,3 +1,5 @@
+import json
+
 from app.agent import ToolCallRecord
 from app.responses_schema import (
     build_response,
@@ -66,7 +68,7 @@ def test_build_response_includes_function_call_items_before_message():
     assert response["output"][-1]["content"][0]["text"] == "Soy Rodrigo."
 
 
-def test_build_response_adds_a2ui_part_for_ps_trophies():
+def test_build_response_adds_a2ui_resource_part_for_ps_trophies():
     trofeos = [
         {"juego": "Grounded", "plataforma": "PS5", "nombre_trofeo": "X", "porcentaje_jugadores_con_este_trofeo": "0.5"}
     ]
@@ -74,20 +76,21 @@ def test_build_response_adds_a2ui_part_for_ps_trophies():
 
     response = build_response(model="claude-sonnet-5", final_text="Tengo varios platinos.", tool_calls=tool_calls)
 
-    # La parte de A2UI va como su propio item de "output", después del
-    # mensaje de texto -- no anidada dentro de su content.
+    # El "resource" de A2UI va como su propio item de "output", después del
+    # mensaje de texto -- no anidado dentro de su content.
     types = [item["type"] for item in response["output"]]
-    assert types == ["function_call", "message", "data"]
+    assert types == ["function_call", "message", "resource"]
 
     message_item = response["output"][1]
     assert message_item["content"][0]["text"] == "Tengo varios platinos."
 
-    a2ui_item = response["output"][2]
-    assert a2ui_item["kind"] == "data"
-    assert a2ui_item["metadata"]["mimeType"] == "application/a2ui+json"
-    a2ui_messages = a2ui_item["data"]
+    resource_item = response["output"][2]
+    assert resource_item["resource"]["mimeType"] == "application/a2ui+json"
+    assert resource_item["resource"]["uri"] == "a2ui://banorte-cv-agent/ps_trophies"
+    a2ui_messages = json.loads(resource_item["resource"]["text"])
     assert a2ui_messages[0]["createSurface"]["surfaceId"] == "ps_trophies"
     assert a2ui_messages[1]["updateComponents"]["surfaceId"] == "ps_trophies"
+    assert a2ui_messages[2]["updateDataModel"]["surfaceId"] == "ps_trophies"
 
 
 def test_build_response_no_a2ui_part_without_ps_trophies_tool():
