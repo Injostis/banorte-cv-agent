@@ -20,6 +20,16 @@ def test_missing_auth_returns_401():
     assert response.status_code == 401
 
 
+def test_agent_card_is_public_and_declares_a2ui_extension():
+    response = client.get("/.well-known/agent-card.json")
+    assert response.status_code == 200
+    card = response.json()
+    assert card["name"]
+    assert card["url"].endswith("/responses")
+    extension_uris = [ext["uri"] for ext in card["capabilities"]["extensions"]]
+    assert "https://a2ui.org/a2a-extension/a2ui/v0.8" in extension_uris
+
+
 def test_wrong_token_returns_401():
     response = client.post("/responses", json={"input": "hola"}, headers={"Authorization": "Bearer token-incorrecto"})
     assert response.status_code == 401

@@ -2,7 +2,7 @@ import logging
 import time
 from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.agent import run_agent
@@ -37,6 +37,49 @@ def verify_token(credentials: HTTPAuthorizationCredentials | None = Depends(bear
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/.well-known/agent-card.json")
+def agent_card(request: Request) -> dict[str, Any]:
+    """Tarjeta de agente (protocolo A2A). Declara el soporte experimental de
+    A2UI vía capabilities.extensions -- sin esta declaración, un cliente
+    que sí sabe renderizar A2UI podría no buscarlo siquiera en las
+    respuestas. Pública a propósito (sin auth): así es como funciona el
+    descubrimiento de agentes."""
+    base_url = str(request.base_url).rstrip("/")
+    return {
+        "protocolVersion": "0.3.0",
+        "name": "Agente de CV — Rodrigo Rios",
+        "description": (
+            "Conversa sobre la trayectoria profesional de Rodrigo: experiencia, proyectos, habilidades y educación."
+        ),
+        "url": f"{base_url}/responses",
+        "version": "0.1.0",
+        "capabilities": {
+            "streaming": False,
+            "pushNotifications": False,
+            "extensions": [
+                {
+                    "uri": "https://a2ui.org/a2a-extension/a2ui/v0.8",
+                    "description": "Puede incluir componentes A2UI en sus respuestas, siempre con respaldo de texto.",
+                    "required": False,
+                }
+            ],
+        },
+        "defaultInputModes": ["text/plain"],
+        "defaultOutputModes": ["text/plain", "application/json+a2ui"],
+        "skills": [
+            {
+                "id": "cv-qa",
+                "name": "Preguntas sobre el perfil profesional",
+                "description": (
+                    "Responde preguntas sobre experiencia laboral, proyectos, habilidades y educación de Rodrigo."
+                ),
+                "tags": ["cv", "recruiting"],
+                "examples": ["¿Qué proyectos has construido?", "Cuéntame de tu experiencia laboral"],
+            }
+        ],
+    }
 
 
 @app.post("/responses", dependencies=[Depends(verify_token)])

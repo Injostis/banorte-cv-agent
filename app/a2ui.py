@@ -4,7 +4,11 @@ renderiza en su chat real.
 
 Experimental: se manda como una parte adicional del contenido del mensaje,
 junto al texto normal (que siempre está y siempre se ve, pase lo que pase
-con esto -- ver app/responses_schema.py: build_response). Si la
+con esto -- ver app/responses_schema.py: build_response). El formato de
+detección es el de la extensión A2A para A2UI (DataPart con
+metadata.mimeType = "application/json+a2ui"), declarada también en
+/.well-known/agent-card.json -- sin esa declaración de capacidad, un
+cliente que sí sabe renderizar A2UI podría no buscarlo siquiera. Si la
 plataforma no sabe interpretarlo, no debería romper nada más que esta
 parte; y si sí se ve mal, este archivo es lo único que hay que quitar
 para revertir el experimento.
@@ -70,11 +74,20 @@ def build_ps_trophies_surface(trofeos: list[dict[str, Any]], surface_id: str = "
             }
         )
 
+    # Formato de DataPart de la extensión A2A para A2UI: el mecanismo de
+    # detección real es el mimeType en metadata, no un campo "type" propio
+    # -- se incluye "type": "data" también por si el cliente espera un
+    # content part discriminado al estilo Open Responses; no hace daño
+    # tenerlo de más.
     return {
-        "type": "a2ui",
-        "version": "v0.9.1",
-        "messages": [
-            {"version": "v0.9.1", "createSurface": {"surfaceId": surface_id, "catalogId": CATALOG_URL}},
-            {"version": "v0.9.1", "updateComponents": {"surfaceId": surface_id, "components": components}},
-        ],
+        "type": "data",
+        "kind": "data",
+        "metadata": {"mimeType": "application/json+a2ui"},
+        "data": {
+            "version": "v0.9.1",
+            "messages": [
+                {"version": "v0.9.1", "createSurface": {"surfaceId": surface_id, "catalogId": CATALOG_URL}},
+                {"version": "v0.9.1", "updateComponents": {"surfaceId": surface_id, "components": components}},
+            ],
+        },
     }
