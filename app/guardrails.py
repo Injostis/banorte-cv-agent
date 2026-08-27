@@ -128,7 +128,7 @@ GENERIC_INJECTION_MESSAGE = (
     "la trayectoria profesional de Rodrigo: experiencia, proyectos, habilidades y educación."
 )
 OFF_TOPIC_MESSAGE = (
-    "Esa pregunta se sale de lo que puedo platicar. Solo hablo sobre la trayectoria "
+    "Eso se sale de lo que puedo platicar. Solo hablo sobre la trayectoria "
     "profesional de Rodrigo: experiencia, proyectos, habilidades y educación. "
     "¿Te gustaría preguntar algo sobre eso?"
 )

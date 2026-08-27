@@ -16,6 +16,7 @@ from typing import Any
 from anthropic.types import MessageParam
 from pydantic import BaseModel, ConfigDict
 
+from app.a2ui import build_ps_trophies_surface
 from app.agent import ToolCallRecord
 
 
@@ -105,13 +106,21 @@ def build_response(*, model: str, final_text: str, tool_calls: list[ToolCallReco
                 "status": "completed",
             }
         )
+    content: list[dict[str, Any]] = [{"type": "output_text", "text": final_text, "annotations": []}]
+
+    ps_trophies_call = next((call for call in tool_calls if call.name == "get_ps_trophies"), None)
+    if ps_trophies_call is not None:
+        trofeos = ps_trophies_call.output.get("trofeos")
+        if isinstance(trofeos, list) and trofeos:
+            content.append(build_ps_trophies_surface(trofeos))
+
     output.append(
         {
             "id": f"msg_{uuid.uuid4().hex[:24]}",
             "type": "message",
             "role": "assistant",
             "status": "completed",
-            "content": [{"type": "output_text", "text": final_text, "annotations": []}],
+            "content": content,
         }
     )
     return {

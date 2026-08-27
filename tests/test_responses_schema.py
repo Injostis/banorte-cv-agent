@@ -63,3 +63,25 @@ def test_build_response_includes_function_call_items_before_message():
     assert types == ["function_call", "message"]
     assert response["output"][0]["name"] == "get_summary"
     assert response["output"][-1]["content"][0]["text"] == "Soy Rodrigo."
+
+
+def test_build_response_adds_a2ui_part_for_ps_trophies():
+    trofeos = [
+        {"juego": "Grounded", "plataforma": "PS5", "nombre_trofeo": "X", "porcentaje_jugadores_con_este_trofeo": "0.5"}
+    ]
+    tool_calls = [ToolCallRecord(name="get_ps_trophies", input={}, output={"trofeos": trofeos})]
+
+    response = build_response(model="claude-sonnet-5", final_text="Tengo varios platinos.", tool_calls=tool_calls)
+
+    content = response["output"][-1]["content"]
+    assert content[0]["type"] == "output_text"
+    assert content[1]["type"] == "a2ui"
+    assert content[1]["messages"][0]["createSurface"]["surfaceId"] == "ps_trophies"
+
+
+def test_build_response_no_a2ui_part_without_ps_trophies_tool():
+    tool_calls = [ToolCallRecord(name="get_summary", input={}, output={"nombre": "Rodrigo"})]
+    response = build_response(model="claude-sonnet-5", final_text="Soy Rodrigo.", tool_calls=tool_calls)
+
+    content = response["output"][-1]["content"]
+    assert len(content) == 1

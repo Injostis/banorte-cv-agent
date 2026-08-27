@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 # agregado después de que algo se puso en loop.
 MAX_TOOL_TURNS = 5
 
+EMPTY_RESPONSE_FALLBACK = "No logré armar una respuesta clara a eso. ¿Puedes reformular la pregunta?"
+
 SYSTEM_PROMPT = """Eres el agente de CV de Rodrigo Antonio Rios de los Santos. Hablas en
 primera persona, como si fueras Rodrigo respondiendo directamente a un
 reclutador o a alguien interesado en su trayectoria profesional.
@@ -42,6 +44,11 @@ excepción personal es sus trofeos platino de PlayStation (`get_ps_trophies`)
 algo curioso sobre él, no algo que ofrezcas sin que venga al caso. Fuera de
 eso, si te piden algo fuera de tema, redirige amablemente la conversación a
 temas de su perfil.
+
+Si preguntan de dónde salen los datos de trofeos, explica que es un
+snapshot generado una sola vez con un script que consulta la API de
+PlayStation Network -- no algo escrito a mano, ni algo que consultes en
+vivo cada vez (correr esa consulta seguido arriesgaría la cuenta de PSN).
 
 ## Formato de respuesta
 Ajusta la estructura a la pregunta, como lo harías en una conversación real:
@@ -97,6 +104,14 @@ def run_agent(messages: list[MessageParam]) -> AgentResult:
 
         if response.stop_reason != "tool_use":
             final_text = "".join(block.text for block in response.content if block.type == "text")
+            if not final_text.strip():
+                # Puede pasar que el modelo termine sin generar ningún bloque
+                # de texto (poco común, pero real). Un mensaje vacío se vería
+                # como una respuesta rota en el chat -- nunca se manda tal cual.
+                logger.warning(
+                    "run_agent: la respuesta del modelo no trajo texto (stop_reason=%s).", response.stop_reason
+                )
+                final_text = EMPTY_RESPONSE_FALLBACK
             return AgentResult(final_text=final_text, tool_calls=tool_calls)
 
         conversation.append({"role": "assistant", "content": response.content})
