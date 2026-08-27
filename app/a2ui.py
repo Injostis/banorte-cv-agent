@@ -2,17 +2,18 @@
 platino de PlayStation, para que la plataforma de Banorte los renderice en
 su chat real.
 
-Experimental: se manda como partes adicionales del contenido del mensaje,
+Experimental: se manda como una parte adicional del contenido del mensaje,
 junto al texto normal (que siempre está y siempre se ve, pase lo que pase
 con esto -- ver app/responses_schema.py: build_response). El formato de
 detección es el de la extensión A2A para A2UI (DataPart con
-metadata.mimeType = "application/json+a2ui"), declarada también en
+metadata.mimeType = "application/a2ui+json" -- ojo con el orden de las
+palabras, es fácil confundirlo), declarada también en
 /.well-known/agent-card.json.
 
-Cada mensaje del protocolo (createSurface, updateComponents, ...) va como
-su propia Part -- el spec es explícito: "cada envelope de A2UI corresponde
-al payload de una sola Part de A2A", no se agrupan varios en un mismo
-bloque.
+Todos los mensajes del protocolo (createSurface, updateComponents, ...)
+van juntos como una lista dentro del campo "data" de una sola Part -- por
+especificación esa lista "no es una unidad transaccional", pero sí es una
+sola Part, no una por mensaje.
 
 No hay un componente de gráfica en el catálogo básico de A2UI (Text,
 Image, Card, Column, Row, Button, etc. -- nada de "Chart"), así que la
@@ -23,7 +24,7 @@ dibujadas con precisión.
 from typing import Any
 
 CATALOG_URL = "https://a2ui.org/specification/v0_9_1/catalogs/basic/catalog.json"
-A2UI_MIME_TYPE = "application/json+a2ui"
+A2UI_MIME_TYPE = "application/a2ui+json"
 
 
 def _rarity_value(trofeo: dict[str, Any]) -> float:
@@ -84,12 +85,16 @@ def build_ps_trophies_messages(trofeos: list[dict[str, Any]], surface_id: str = 
     ]
 
 
-def wrap_as_a2a_data_part(message: dict[str, Any]) -> dict[str, Any]:
-    """Envuelve un solo mensaje A2UI como una Part de A2A detectable por su
-    mimeType -- el mecanismo de detección real, no un campo inventado."""
+def wrap_as_a2a_data_part(messages: list[dict[str, Any]]) -> dict[str, Any]:
+    """Envuelve la lista completa de mensajes A2UI en una sola Part de A2A.
+
+    Por especificación, "data" es una lista de mensajes (no es una unidad
+    transaccional), y el mimeType exacto que la identifica es
+    "application/a2ui+json" -- ojo con el orden, es fácil confundirlo con
+    "application/json+a2ui" (el error que tenía antes)."""
     return {
         "type": "data",
         "kind": "data",
         "metadata": {"mimeType": A2UI_MIME_TYPE},
-        "data": message,
+        "data": messages,
     }

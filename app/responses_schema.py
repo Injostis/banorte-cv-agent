@@ -112,8 +112,8 @@ def build_response(*, model: str, final_text: str, tool_calls: list[ToolCallReco
     if ps_trophies_call is not None:
         trofeos = ps_trophies_call.output.get("trofeos")
         if isinstance(trofeos, list) and trofeos:
-            for message in build_ps_trophies_messages(trofeos):
-                content.append(wrap_as_a2a_data_part(message))
+            messages = build_ps_trophies_messages(trofeos)
+            content.append(wrap_as_a2a_data_part(messages))
 
     output.append(
         {
