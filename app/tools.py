@@ -12,6 +12,7 @@ from typing import Any
 from anthropic.types import ToolParam
 from langfuse import observe
 
+from app.a2ui import build_ps_trophies_tool_result
 from app.profile_data import load_profile
 from app.ps_trophies_data import load_ps_trophies
 
@@ -62,9 +63,20 @@ TOOL_SCHEMAS: list[ToolParam] = [
     {
         "name": "get_ps_trophies",
         "description": (
-            "Obtiene la lista de trofeos platino de PlayStation de Rodrigo (juego, plataforma, fecha, y qué "
-            "porcentaje de jugadores en el mundo también lo tiene). Es un dato personal/curioso, no profesional "
-            "-- úsala solo si preguntan por hobbies, videojuegos o algo curioso sobre Rodrigo."
+            "Obtiene la lista completa de trofeos platino de PlayStation de Rodrigo (juego, plataforma, fecha, y "
+            "qué porcentaje de jugadores en el mundo también lo tiene). Es un dato personal/curioso, no "
+            "profesional -- úsala para preguntas puntuales sobre un juego o dato específico. Para un panorama o "
+            "comparación (ej. '¿cuáles son tus más raros?'), usa mejor `show_ps_trophies_table`."
+        ),
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "show_ps_trophies_table",
+        "description": (
+            "Muestra una tabla visual con los 5 platinos más raros de Rodrigo en PlayStation (juego y porcentaje "
+            "de jugadores que también lo tiene). Úsala cuando pidan un panorama o comparación de sus trofeos, no "
+            "para una pregunta puntual sobre un solo juego (para eso usa `get_ps_trophies`). Muéstrala una sola "
+            "vez por conversación -- si ya la mostraste, no la repitas, solo refiérete a ella en tu respuesta."
         ),
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
@@ -106,6 +118,14 @@ def _get_ps_trophies(_: dict[str, Any]) -> dict[str, Any]:
     return {"total_platinos": len(trofeos), "trofeos": trofeos}
 
 
+def _show_ps_trophies_table(_: dict[str, Any]) -> dict[str, Any]:
+    """Regresa un CallToolResult: un fallback en texto (lo que lee el
+    modelo) más un content part "resource" con la superficie A2UI (lo que
+    arma la respuesta visual). Ver app/a2ui.py."""
+    trofeos = load_ps_trophies()
+    return build_ps_trophies_tool_result(trofeos)
+
+
 _DISPATCH = {
     "get_summary": _get_summary,
     "get_experience": _get_experience,
@@ -114,6 +134,7 @@ _DISPATCH = {
     "get_education": _get_education,
     "get_contact": _get_contact,
     "get_ps_trophies": _get_ps_trophies,
+    "show_ps_trophies_table": _show_ps_trophies_table,
 }
 
 

@@ -5,10 +5,11 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from langfuse import get_client
 
-from app.agent import run_agent
+from app.agent import ToolCallRecord, run_agent
 from app.config import settings
 from app.guardrails import GuardrailRejection, check_input
 from app.observability import init_langfuse
@@ -18,6 +19,7 @@ from app.responses_schema import (
     last_user_has_image,
     last_user_text,
     normalize_input,
+    stream_response_events,
     to_anthropic_messages,
     transcript_before_last_user,
 )
@@ -81,7 +83,7 @@ def agent_card(request: Request) -> dict[str, Any]:
         ],
         "version": "0.1.0",
         "capabilities": {
-            "streaming": False,
+            "streaming": True,
             "pushNotifications": False,
             "extensions": [
                 {
@@ -92,7 +94,7 @@ def agent_card(request: Request) -> dict[str, Any]:
             ],
         },
         "defaultInputModes": ["text/plain"],
-        "defaultOutputModes": ["text/plain", "application/json+a2ui"],
+        "defaultOutputModes": ["text/plain", "application/a2ui+json"],
         "skills": [
             {
                 "id": "cv-qa",
@@ -107,8 +109,21 @@ def agent_card(request: Request) -> dict[str, Any]:
     }
 
 
+def _respond(request: ResponsesRequest, *, final_text: str, tool_calls: list[ToolCallRecord]) -> Any:
+    """Arma la respuesta final, completa o en streaming según lo haya
+    pedido el cliente (`request.stream`). El camino sin streaming -- el que
+    ya usa Banorte hoy -- no cambia: sigue siendo exactamente build_response().
+    """
+    if request.stream:
+        return StreamingResponse(
+            stream_response_events(model=settings.claude_model, final_text=final_text, tool_calls=tool_calls),
+            media_type="text/event-stream",
+        )
+    return build_response(model=settings.claude_model, final_text=final_text, tool_calls=tool_calls)
+
+
 @app.post("/responses", dependencies=[Depends(verify_token)])
-def create_response(request: ResponsesRequest) -> dict[str, Any]:
+def create_response(request: ResponsesRequest) -> Any:
     start = time.monotonic()
     items = normalize_input(request.input)
     user_text = last_user_text(items)
@@ -127,7 +142,7 @@ def create_response(request: ResponsesRequest) -> dict[str, Any]:
             check_input(user_text, context=context)
         except GuardrailRejection as rejection:
             logger.info("Guardrail rechazó un mensaje. Motivo interno: %s", rejection.internal_reason)
-            return build_response(model=settings.claude_model, final_text=rejection.user_message, tool_calls=[])
+            return _respond(request, final_text=rejection.user_message, tool_calls=[])
 
     messages = to_anthropic_messages(items)
 
@@ -139,8 +154,8 @@ def create_response(request: ResponsesRequest) -> dict[str, Any]:
         # llegar a Banorte como un 500 crudo -- el chat debe poder mostrar
         # algo coherente y el usuario debe poder reintentar.
         logger.exception("Fallo inesperado ejecutando el agente.")
-        return build_response(
-            model=settings.claude_model,
+        return _respond(
+            request,
             final_text="Tuve un problema técnico procesando tu pregunta. ¿Puedes intentar de nuevo?",
             tool_calls=[],
         )
@@ -149,4 +164,4 @@ def create_response(request: ResponsesRequest) -> dict[str, Any]:
     tool_names = [call.name for call in result.tool_calls]
     logger.info("Respuesta generada en %.0fms. Tools usadas: %s", elapsed_ms, tool_names or "ninguna")
 
-    return build_response(model=settings.claude_model, final_text=result.final_text, tool_calls=result.tool_calls)
+    return _respond(request, final_text=result.final_text, tool_calls=result.tool_calls)

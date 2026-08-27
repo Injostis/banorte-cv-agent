@@ -37,6 +37,14 @@ def test_get_ps_trophies_returns_total_and_list():
     assert any("Batman" in juego for juego in juegos)
 
 
+def test_show_ps_trophies_table_returns_call_tool_result_with_resource():
+    result = execute_tool("show_ps_trophies_table", {})
+    types = [part["type"] for part in result["content"]]
+    assert types == ["text", "resource"]
+    assert result["content"][0]["text"]  # el fallback no está vacío
+    assert result["content"][1]["resource"]["mimeType"] == "application/a2ui+json"
+
+
 def test_unknown_tool_returns_error_dict_instead_of_raising():
     result = execute_tool("tool_que_no_existe", {})
     assert "error" in result

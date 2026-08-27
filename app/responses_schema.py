@@ -11,12 +11,12 @@ un parseo demasiado estricto.
 import json
 import time
 import uuid
+from collections.abc import Iterator
 from typing import Any
 
 from anthropic.types import ImageBlockParam, MessageParam, TextBlockParam
 from pydantic import BaseModel, ConfigDict
 
-from app.a2ui import build_ps_trophies_tool_result
 from app.agent import ToolCallRecord
 from app.images import extract_image_urls, image_block_from_url
 
@@ -26,6 +26,7 @@ class ResponsesRequest(BaseModel):
 
     model: str | None = None
     input: list[dict[str, Any]] | str
+    stream: bool = False
 
 
 def _item_text(item: dict[str, Any]) -> str:
@@ -114,7 +115,10 @@ def transcript_before_last_user(items: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def build_response(*, model: str, final_text: str, tool_calls: list[ToolCallRecord]) -> dict[str, Any]:
+def _build_output_items(final_text: str, tool_calls: list[ToolCallRecord]) -> list[dict[str, Any]]:
+    """Arma la lista de items de "output" -- compartida entre la respuesta
+    completa (build_response) y la respuesta en streaming
+    (stream_response_events), para no duplicar esta lógica dos veces."""
     output: list[dict[str, Any]] = []
     for call in tool_calls:
         output.append(
@@ -127,6 +131,17 @@ def build_response(*, model: str, final_text: str, tool_calls: list[ToolCallReco
                 "status": "completed",
             }
         )
+
+        # Si la tool regresó un CallToolResult (una superficie A2UI, ver
+        # app/a2ui.py y app/tools.py), su content part "resource"
+        # (convención EmbeddedResource de MCP) se agrega como su propio
+        # item de "output", al mismo nivel que "message" y "function_call".
+        content = call.output.get("content")
+        if isinstance(content, list):
+            resource_part = next((p for p in content if isinstance(p, dict) and p.get("type") == "resource"), None)
+            if resource_part is not None:
+                output.append(resource_part)
+
     output.append(
         {
             "id": f"msg_{uuid.uuid4().hex[:24]}",
@@ -136,24 +151,66 @@ def build_response(*, model: str, final_text: str, tool_calls: list[ToolCallReco
             "content": [{"type": "output_text", "text": final_text, "annotations": []}],
         }
     )
+    return output
 
-    # El content part "resource" (convención EmbeddedResource de MCP) va
-    # como su propio item de "output", al mismo nivel que "message" y
-    # "function_call". El fallback en texto no se duplica aquí -- el
-    # mensaje final del agente ya cumple ese papel.
-    ps_trophies_call = next((call for call in tool_calls if call.name == "get_ps_trophies"), None)
-    if ps_trophies_call is not None:
-        trofeos = ps_trophies_call.output.get("trofeos")
-        if isinstance(trofeos, list) and trofeos:
-            tool_result = build_ps_trophies_tool_result(trofeos)
-            resource_part = next(part for part in tool_result["content"] if part["type"] == "resource")
-            output.append(resource_part)
 
+def build_response(*, model: str, final_text: str, tool_calls: list[ToolCallRecord]) -> dict[str, Any]:
     return {
         "id": f"resp_{uuid.uuid4().hex[:24]}",
         "object": "response",
         "created_at": int(time.time()),
         "model": model,
         "status": "completed",
-        "output": output,
+        "output": _build_output_items(final_text, tool_calls),
     }
+
+
+def stream_response_events(*, model: str, final_text: str, tool_calls: list[ToolCallRecord]) -> Iterator[str]:
+    """Genera la misma respuesta que build_response(), como eventos SSE en
+    vez de un JSON completo de una sola pieza. No es streaming token por
+    token real -- la respuesta ya está calculada completa; se entrega como
+    una secuencia corta de eventos porque el render de una superficie A2UI
+    del lado del cliente parece requerir el camino de streaming, no el de
+    respuesta completa (mismo contenido exacto, comportamiento distinto
+    entre los dos caminos, probado en vivo).
+    """
+    response_id = f"resp_{uuid.uuid4().hex[:24]}"
+    created_at = int(time.time())
+    output_items = _build_output_items(final_text, tool_calls)
+
+    def _event(event_type: str, data: dict[str, Any]) -> str:
+        payload = {"type": event_type, **data}
+        return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+    yield _event(
+        "response.created",
+        {
+            "response": {
+                "id": response_id,
+                "object": "response",
+                "created_at": created_at,
+                "model": model,
+                "status": "in_progress",
+                "output": [],
+            }
+        },
+    )
+
+    for index, item in enumerate(output_items):
+        yield _event("response.output_item.added", {"output_index": index, "item": item})
+        if item["type"] == "message":
+            text = item["content"][0]["text"]
+            yield _event("response.output_text.delta", {"output_index": index, "content_index": 0, "delta": text})
+            yield _event("response.output_text.done", {"output_index": index, "content_index": 0, "text": text})
+        yield _event("response.output_item.done", {"output_index": index, "item": item})
+
+    final_response = {
+        "id": response_id,
+        "object": "response",
+        "created_at": created_at,
+        "model": model,
+        "status": "completed",
+        "output": output_items,
+    }
+    yield _event("response.completed", {"response": final_response})
+    yield "data: [DONE]\n\n"

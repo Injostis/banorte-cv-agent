@@ -1,3 +1,4 @@
+
 """Loop de tool-use del agente de CV sobre el SDK de Anthropic.
 
 El modelo pide una tool, el código la ejecuta, se le regresa el resultado, y
@@ -42,11 +43,19 @@ vacío con algo que suene plausible.
 
 ## Alcance
 Hablas principalmente de la trayectoria profesional de Rodrigo. La única
-excepción personal es sus trofeos platino de PlayStation (`get_ps_trophies`)
--- un dato curioso que puedes compartir si preguntan por hobbies, gustos o
-algo curioso sobre él, no algo que ofrezcas sin que venga al caso. Fuera de
-eso, si te piden algo fuera de tema, redirige amablemente la conversación a
+excepción personal es sus trofeos platino de PlayStation -- un dato
+curioso que puedes compartir si preguntan por hobbies, gustos o algo
+curioso sobre él, no algo que ofrezcas sin que venga al caso. Fuera de eso,
+si te piden algo fuera de tema, redirige amablemente la conversación a
 temas de su perfil.
+
+Para trofeos: usa `get_ps_trophies` en preguntas puntuales sobre un juego o
+dato específico. Usa `show_ps_trophies_table` cuando pidan un panorama o
+comparación (ej. "¿cuáles son tus más raros?") -- esa tool ya arma una
+tabla visual con los datos, así que tu respuesta de texto debe ser solo
+1-2 frases de interpretación y una pregunta de seguimiento, sin repetir la
+lista completa. Muestra la tabla como máximo una vez por conversación; si
+ya la mostraste, no la repitas, solo haz referencia a ella.
 
 Si preguntan de dónde salen los datos de trofeos, explica que es un
 snapshot generado una sola vez con un script que consulta la API de
@@ -124,6 +133,33 @@ def _call_claude(client: Anthropic, conversation: list[MessageParam]) -> Message
     return response
 
 
+def _content_for_model(output: dict[str, Any]) -> str:
+    """Lo que el modelo lee del resultado de una tool.
+
+    Si la tool regresó un CallToolResult (una superficie A2UI adjunta, ver
+    app/a2ui.py), el modelo no necesita ver el JSON completo de la
+    superficie -- solo el resumen en texto, para que su respuesta sea
+    interpretación breve y no repita los datos que la superficie ya
+    muestra visualmente.
+    """
+    content = output.get("content")
+    if isinstance(content, list):
+        text_part = next((p for p in content if isinstance(p, dict) and p.get("type") == "text"), None)
+        if text_part is not None:
+            return json.dumps(
+                {
+                    "resumen_visual": text_part["text"],
+                    "nota": (
+                        "Esto ya se muestra en una tabla visual adjunta a tu respuesta. "
+                        "Da solo 1-2 frases de interpretación y una pregunta de seguimiento -- "
+                        "no repitas la lista completa en tu texto."
+                    ),
+                },
+                ensure_ascii=False,
+            )
+    return json.dumps(output, ensure_ascii=False)
+
+
 @observe(as_type="agent", name="cv-agent-turn")
 def run_agent(messages: list[MessageParam]) -> AgentResult:
     client = get_anthropic_client()
@@ -157,7 +193,7 @@ def run_agent(messages: list[MessageParam]) -> AgentResult:
                 {
                     "type": "tool_result",
                     "tool_use_id": block.id,
-                    "content": json.dumps(output, ensure_ascii=False),
+                    "content": _content_for_model(output),
                 }
             )
         conversation.append({"role": "user", "content": tool_results_content})

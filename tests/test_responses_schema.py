@@ -1,11 +1,13 @@
 import json
 
+from app.a2ui import build_ps_trophies_tool_result
 from app.agent import ToolCallRecord
 from app.responses_schema import (
     build_response,
     last_user_has_image,
     last_user_text,
     normalize_input,
+    stream_response_events,
     to_anthropic_messages,
     transcript_before_last_user,
 )
@@ -72,19 +74,20 @@ def test_build_response_adds_a2ui_resource_part_for_ps_trophies():
     trofeos = [
         {"juego": "Grounded", "plataforma": "PS5", "nombre_trofeo": "X", "porcentaje_jugadores_con_este_trofeo": "0.5"}
     ]
-    tool_calls = [ToolCallRecord(name="get_ps_trophies", input={}, output={"trofeos": trofeos})]
+    tool_result = build_ps_trophies_tool_result(trofeos)
+    tool_calls = [ToolCallRecord(name="show_ps_trophies_table", input={}, output=tool_result)]
 
     response = build_response(model="claude-sonnet-5", final_text="Tengo varios platinos.", tool_calls=tool_calls)
 
-    # El "resource" de A2UI va como su propio item de "output", después del
-    # mensaje de texto -- no anidado dentro de su content.
+    # El "resource" de A2UI sale justo después de su function_call (no
+    # anidado en el content del mensaje), y el mensaje final va al final.
     types = [item["type"] for item in response["output"]]
-    assert types == ["function_call", "message", "resource"]
+    assert types == ["function_call", "resource", "message"]
 
-    message_item = response["output"][1]
+    message_item = response["output"][2]
     assert message_item["content"][0]["text"] == "Tengo varios platinos."
 
-    resource_item = response["output"][2]
+    resource_item = response["output"][1]
     assert resource_item["resource"]["mimeType"] == "application/a2ui+json"
     assert resource_item["resource"]["uri"] == "a2ui://banorte-cv-agent/ps_trophies"
     a2ui_messages = json.loads(resource_item["resource"]["text"])
@@ -135,3 +138,35 @@ def test_last_user_has_image_true_and_false():
     without_image = [{"type": "message", "role": "user", "content": "hola"}]
     assert last_user_has_image(with_image) is True
     assert last_user_has_image(without_image) is False
+
+
+def test_stream_response_events_matches_build_response_content():
+    tool_calls = [ToolCallRecord(name="get_summary", input={}, output={"nombre": "Rodrigo"})]
+    events = list(stream_response_events(model="claude-sonnet-5", final_text="Soy Rodrigo.", tool_calls=tool_calls))
+
+    assert events[-1] == "data: [DONE]\n\n"
+    assert all(e.startswith("data: ") and e.endswith("\n\n") for e in events)
+
+    event_types = [json.loads(e[len("data: ") :])["type"] for e in events[:-1]]
+    assert event_types[0] == "response.created"
+    assert event_types[-1] == "response.completed"
+    assert "response.output_item.added" in event_types
+    assert "response.output_item.done" in event_types
+    assert "response.output_text.delta" in event_types
+
+    completed = json.loads(events[-2][len("data: ") :])
+    assert completed["response"]["status"] == "completed"
+    types_in_output = [item["type"] for item in completed["response"]["output"]]
+    assert types_in_output == ["function_call", "message"]
+    assert completed["response"]["output"][-1]["content"][0]["text"] == "Soy Rodrigo."
+
+
+def test_stream_response_events_includes_a2ui_resource_item():
+    trofeos = [{"juego": "Grounded", "porcentaje_jugadores_con_este_trofeo": "0.5"}]
+    tool_result = build_ps_trophies_tool_result(trofeos)
+    tool_calls = [ToolCallRecord(name="show_ps_trophies_table", input={}, output=tool_result)]
+
+    events = list(stream_response_events(model="claude-sonnet-5", final_text="Aquí están.", tool_calls=tool_calls))
+    completed = json.loads(events[-2][len("data: ") :])
+    types_in_output = [item["type"] for item in completed["response"]["output"]]
+    assert "resource" in types_in_output
