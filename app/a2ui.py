@@ -75,8 +75,11 @@ def build_ps_trophies_tool_result(trofeos: list[dict[str, Any]]) -> dict[str, An
             "children": {"path": "/ps_trophies/items", "componentId": "row"},
         },
         {"id": "row", "component": "Row", "children": ["juego", "rareza"]},
-        {"id": "juego", "component": "Text", "variant": "body", "text": {"path": "/juego"}, "weight": 3},
-        {"id": "rareza", "component": "Text", "variant": "caption", "text": {"path": "/rareza"}, "weight": 1},
+        # Dentro del template de "list", los paths son relativos al item de la
+        # iteración -- sin "/" inicial. Con "/" se leerían como ruta absoluta
+        # desde la raíz del modelo de datos, donde no existen.
+        {"id": "juego", "component": "Text", "variant": "body", "text": {"path": "juego"}, "weight": 3},
+        {"id": "rareza", "component": "Text", "variant": "caption", "text": {"path": "rareza"}, "weight": 1},
     ]
 
     items = [
