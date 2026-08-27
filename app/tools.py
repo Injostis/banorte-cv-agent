@@ -10,6 +10,7 @@ import logging
 from typing import Any
 
 from anthropic.types import ToolParam
+from langfuse import observe
 
 from app.profile_data import load_profile
 from app.ps_trophies_data import load_ps_trophies
@@ -116,6 +117,7 @@ _DISPATCH = {
 }
 
 
+@observe(as_type="tool", name="execute_tool")
 def execute_tool(name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
     """Nunca deja que un fallo de una tool tumbe la conversación completa.
 

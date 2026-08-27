@@ -77,7 +77,8 @@ corre una vez y deja un archivo; el agente en producción solo lo lee.
 ## Stack
 
 Python 3.13, FastAPI, SDK oficial de `anthropic` (tool use nativo, sin
-framework de agentes encima), Pydantic, `uv` para dependencias, Docker.
+framework de agentes encima), Pydantic, `uv` para dependencias, Docker,
+Langfuse para trazas/costos (opcional).
 
 ## Estructura
 

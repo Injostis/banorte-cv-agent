@@ -1,6 +1,7 @@
 from app.agent import ToolCallRecord
 from app.responses_schema import (
     build_response,
+    last_user_has_image,
     last_user_text,
     normalize_input,
     to_anthropic_messages,
@@ -95,3 +96,39 @@ def test_build_response_no_a2ui_part_without_ps_trophies_tool():
 
     content = response["output"][-1]["content"]
     assert len(content) == 1
+
+
+def test_to_anthropic_messages_builds_multipart_content_for_image_plus_text():
+    items = [
+        {
+            "type": "message",
+            "role": "user",
+            "content": [
+                {"type": "input_image", "image_url": "https://example.com/perro.jpg"},
+                {"type": "input_text", "text": "¿qué te parece?"},
+            ],
+        }
+    ]
+    messages = to_anthropic_messages(items)
+    assert len(messages) == 1
+    content = messages[0]["content"]
+    assert content[0] == {"type": "image", "source": {"type": "url", "url": "https://example.com/perro.jpg"}}
+    assert content[1] == {"type": "text", "text": "¿qué te parece?"}
+
+
+def test_to_anthropic_messages_image_only_no_text():
+    items = [
+        {"type": "message", "role": "user", "content": [{"type": "input_image", "image_url": "https://x.com/a.jpg"}]}
+    ]
+    messages = to_anthropic_messages(items)
+    assert len(messages) == 1
+    assert messages[0]["content"] == [{"type": "image", "source": {"type": "url", "url": "https://x.com/a.jpg"}}]
+
+
+def test_last_user_has_image_true_and_false():
+    with_image = [
+        {"type": "message", "role": "user", "content": [{"type": "input_image", "image_url": "https://x.com/a.jpg"}]}
+    ]
+    without_image = [{"type": "message", "role": "user", "content": "hola"}]
+    assert last_user_has_image(with_image) is True
+    assert last_user_has_image(without_image) is False

@@ -13,11 +13,12 @@ import time
 import uuid
 from typing import Any
 
-from anthropic.types import MessageParam
+from anthropic.types import ImageBlockParam, MessageParam, TextBlockParam
 from pydantic import BaseModel, ConfigDict
 
 from app.a2ui import build_ps_trophies_messages, wrap_as_a2a_data_part
 from app.agent import ToolCallRecord
+from app.images import extract_image_urls, image_block_from_url
 
 
 class ResponsesRequest(BaseModel):
@@ -57,6 +58,9 @@ def to_anthropic_messages(items: list[dict[str, Any]]) -> list[MessageParam]:
     ignora a propósito: el agente ya trae su propio system prompt completo
     (ver app/agent.py) y no depende de que un tercero se lo complemente
     correctamente en cada request.
+
+    Si un mensaje de usuario trae imágenes, se arma como contenido
+    multi-parte (imagen(es) + texto si lo hay) en vez de solo texto plano.
     """
     messages: list[MessageParam] = []
     for item in items:
@@ -64,11 +68,20 @@ def to_anthropic_messages(items: list[dict[str, Any]]) -> list[MessageParam]:
             continue
         role = item.get("role")
         text = _item_text(item)
-        if not text:
-            continue
+
         if role == "user":
-            messages.append({"role": "user", "content": text})
-        elif role == "assistant":
+            image_blocks: list[ImageBlockParam] = [
+                block for url in extract_image_urls(item) if (block := image_block_from_url(url)) is not None
+            ]
+            if image_blocks:
+                content_parts: list[ImageBlockParam | TextBlockParam] = list(image_blocks)
+                if text:
+                    content_parts.append({"type": "text", "text": text})
+                messages.append({"role": "user", "content": content_parts})
+                continue
+            if text:
+                messages.append({"role": "user", "content": text})
+        elif role == "assistant" and text:
             messages.append({"role": "assistant", "content": text})
     return messages
 
@@ -80,6 +93,13 @@ def last_user_text(items: list[dict[str, Any]]) -> str:
     return ""
 
 
+def last_user_has_image(items: list[dict[str, Any]]) -> bool:
+    for item in reversed(items):
+        if item.get("type") == "message" and item.get("role") == "user":
+            return bool(extract_image_urls(item))
+    return False
+
+
 def transcript_before_last_user(items: list[dict[str, Any]]) -> str:
     """Arma un transcript en texto plano de la conversación previa (sin el
     último mensaje del usuario), para dárselo como contexto al guardrail."""
@@ -89,7 +109,8 @@ def transcript_before_last_user(items: list[dict[str, Any]]) -> str:
     lines = []
     for message in messages:
         speaker = "Usuario" if message["role"] == "user" else "Agente"
-        lines.append(f"{speaker}: {message['content']}")
+        content = message["content"] if isinstance(message["content"], str) else "[imagen]"
+        lines.append(f"{speaker}: {content}")
     return "\n".join(lines)
 
 

@@ -106,3 +106,32 @@ def test_unexpected_agent_failure_does_not_return_a_raw_500(monkeypatch):
     assert body["object"] == "response"
     assert body["status"] == "completed"
     assert "problema técnico" in body["output"][-1]["content"][0]["text"]
+
+
+def test_image_only_message_skips_text_guardrail_and_is_not_rejected(monkeypatch):
+    def _fail_if_called(message, context):
+        raise AssertionError("check_input no debería llamarse en un mensaje sin texto")
+
+    monkeypatch.setattr("app.main.check_input", _fail_if_called)
+    monkeypatch.setattr(
+        "app.main.run_agent",
+        lambda messages: AgentResult(final_text="Qué bonito perrito 🐶"),
+    )
+
+    response = client.post(
+        "/responses",
+        json={
+            "input": [
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_image", "image_url": "https://example.com/perro.jpg"}],
+                }
+            ]
+        },
+        headers=AUTH_HEADERS,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["output"][-1]["content"][0]["text"] == "Qué bonito perrito 🐶"

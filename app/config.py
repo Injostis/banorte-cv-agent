@@ -15,5 +15,11 @@ class Settings(BaseSettings):
     ps_trophies_path: Path = Path(__file__).resolve().parent.parent / "data" / "ps_trophies.json"
     log_level: str = "INFO"
 
+    # Opcionales a propósito: sin llaves, Langfuse queda deshabilitado y el
+    # agente sigue funcionando exactamente igual, sin trazas.
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
+    langfuse_host: str = "https://cloud.langfuse.com"
+
 
 settings = Settings()

@@ -93,7 +93,10 @@ def run_case(client: httpx.Client, base_url: str, token: str, case: Case) -> boo
     body = response.json()
 
     tool_names = [item["name"] for item in body["output"] if item["type"] == "function_call"]
-    text: str = body["output"][-1]["content"][0]["text"]
+    # El mensaje de texto no siempre es el último item -- si se usó
+    # get_ps_trophies, el bloque de A2UI (type="data") queda después.
+    message_item = next(item for item in body["output"] if item["type"] == "message")
+    text: str = message_item["content"][0]["text"]
     word_count = len(text.split())
 
     ok = True
