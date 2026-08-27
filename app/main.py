@@ -54,6 +54,13 @@ def agent_card(request: Request) -> dict[str, Any]:
             "Conversa sobre la trayectoria profesional de Rodrigo: experiencia, proyectos, habilidades y educación."
         ),
         "url": f"{base_url}/responses",
+        "supportedInterfaces": [
+            {
+                "url": f"{base_url}/responses",
+                "protocolBinding": "HTTP+JSON",
+                "protocolVersion": "0.3.0",
+            }
+        ],
         "version": "0.1.0",
         "capabilities": {
             "streaming": False,

@@ -26,6 +26,8 @@ def test_agent_card_is_public_and_declares_a2ui_extension():
     card = response.json()
     assert card["name"]
     assert card["url"].endswith("/responses")
+    assert card["supportedInterfaces"][0]["url"].endswith("/responses")
+    assert card["supportedInterfaces"][0]["protocolBinding"] == "HTTP+JSON"
     extension_uris = [ext["uri"] for ext in card["capabilities"]["extensions"]]
     assert "https://a2ui.org/a2a-extension/a2ui/v0.8" in extension_uris
 
