@@ -1,3 +1,5 @@
+import json
+
 import app.tools as tools_module
 from app.tools import execute_tool
 
@@ -43,6 +45,32 @@ def test_show_ps_trophies_table_returns_call_tool_result_with_resource():
     assert types == ["text", "resource"]
     assert result["content"][0]["text"]  # el fallback no está vacío
     assert result["content"][1]["resource"]["mimeType"] == "application/a2ui+json"
+
+
+def test_show_profile_card_includes_github_and_linkedin_buttons():
+    result = execute_tool("show_profile_card", {})
+    types = [part["type"] for part in result["content"]]
+    assert types == ["text", "resource"]
+    assert "linkedin.com" in result["content"][0]["text"]
+    assert "github.com" in result["content"][0]["text"]
+
+    a2ui_messages = json.loads(result["content"][1]["resource"]["text"])
+    components = a2ui_messages[1]["updateComponents"]["components"]
+    actions = [c["action"]["functionCall"]["args"]["url"] for c in components if c.get("component") == "Button"]
+    assert any("linkedin.com" in url for url in actions)
+    assert any("github.com" in url for url in actions)
+
+
+def test_show_skills_levels_orders_by_score_descending():
+    result = execute_tool("show_skills_levels", {})
+    types = [part["type"] for part in result["content"]]
+    assert types == ["text", "resource"]
+
+    a2ui_messages = json.loads(result["content"][1]["resource"]["text"])
+    items = a2ui_messages[2]["updateDataModel"]["value"]["items"]
+    scores = [item["score"] for item in items]
+    assert scores == sorted(scores, reverse=True)
+    assert any(item["nivel_texto"] == "Avanzado" for item in items)
 
 
 def test_unknown_tool_returns_error_dict_instead_of_raising():

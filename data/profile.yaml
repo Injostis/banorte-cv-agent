@@ -11,6 +11,8 @@ titulo: "Ingeniero en Desarrollo de Software"
 contacto:
   email: "rod06@hotmail.es"
   ubicacion: "Monterrey, Nuevo León, México"
+  linkedin: "https://www.linkedin.com/in/rodrigo-antonio-rios-de-los-santos-287205272"
+  repo_github: "https://github.com/Injostis/banorte-cv-agent"
   proyectos_publicos:
     - nombre: "Muralea"
       url: "muralea.com"
@@ -51,6 +53,28 @@ habilidades:
       nivel: Nativo
     - idioma: Inglés
       nivel: "Avanzado (C1)"
+
+# Subconjunto curado (no la lista completa de arriba) para el panorama visual
+# de skills -- solo las que Rodrigo ubicó explícitamente en un nivel.
+habilidades_destacadas:
+  - nombre: TypeScript
+    nivel: avanzado
+  - nombre: React
+    nivel: avanzado
+  - nombre: Vue.js
+    nivel: avanzado
+  - nombre: Python
+    nivel: avanzado
+  - nombre: SQL
+    nivel: avanzado
+  - nombre: "Bases de datos vectoriales"
+    nivel: intermedio
+  - nombre: FastMCP
+    nivel: intermedio
+  - nombre: LangChain
+    nivel: intermedio
+  - nombre: "Google Cloud Platform (GCP)"
+    nivel: basico
 
 experiencia:
   - puesto: "Asistente en Innovación Tecnológica y Facturación"

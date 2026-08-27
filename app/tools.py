@@ -12,7 +12,7 @@ from typing import Any
 from anthropic.types import ToolParam
 from langfuse import observe
 
-from app.a2ui import build_ps_trophies_tool_result
+from app.a2ui import build_profile_card_tool_result, build_ps_trophies_tool_result, build_skills_levels_tool_result
 from app.profile_data import load_profile
 from app.ps_trophies_data import load_ps_trophies
 
@@ -63,10 +63,11 @@ TOOL_SCHEMAS: list[ToolParam] = [
     {
         "name": "get_ps_trophies",
         "description": (
-            "Obtiene la lista completa de trofeos platino de PlayStation de Rodrigo (juego, plataforma, fecha, y "
-            "qué porcentaje de jugadores en el mundo también lo tiene). Es un dato personal/curioso, no "
-            "profesional -- úsala para preguntas puntuales sobre un juego o dato específico. Para un panorama o "
-            "comparación (ej. '¿cuáles son tus más raros?'), usa mejor `show_ps_trophies_table`."
+            "Obtiene la lista completa y detallada de trofeos platino de PlayStation de Rodrigo, uno por uno. Es "
+            "un dato personal/curioso, no profesional -- úsala SOLO para una pregunta muy puntual sobre un juego "
+            "específico que no esté entre los más raros (ej. '¿tienes el platino de X juego en particular?'). "
+            "Para cualquier pregunta general sobre sus platinos ('¿has platinado juegos?', '¿cuántos platinos "
+            "tienes?') o para ver cuáles son los más raros, usa mejor `show_ps_trophies_table`."
         ),
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
@@ -74,9 +75,30 @@ TOOL_SCHEMAS: list[ToolParam] = [
         "name": "show_ps_trophies_table",
         "description": (
             "Muestra una tabla visual con los 5 platinos más raros de Rodrigo en PlayStation (juego y porcentaje "
-            "de jugadores que también lo tiene). Úsala cuando pidan un panorama o comparación de sus trofeos, no "
-            "para una pregunta puntual sobre un solo juego (para eso usa `get_ps_trophies`). Muéstrala una sola "
-            "vez por conversación -- si ya la mostraste, no la repitas, solo refiérete a ella en tu respuesta."
+            "de jugadores que también lo tiene). Úsala para CUALQUIER pregunta sobre sus platinos de PlayStation, "
+            "general o puntual (ej. '¿has platinado juegos?', '¿cuáles son tus más raros?') -- ya incluye tanto el "
+            "total como el detalle visual, así que cubre la pregunta general sin necesitar un segundo turno. "
+            "Muéstrala una sola vez por conversación -- si ya la mostraste, no la repitas, solo refiérete a ella."
+        ),
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "show_profile_card",
+        "description": (
+            "Muestra una tarjeta visual con el nombre, título, resumen, skills avanzadas y botones de GitHub/"
+            "LinkedIn de Rodrigo. Úsala al inicio de la conversación o cuando pidan una vista general de su perfil "
+            "('¿quién eres?', '¿me compartes tu LinkedIn/GitHub?'). Muéstrala una sola vez por conversación -- si "
+            "ya la mostraste, no la repitas, solo refiérete a ella."
+        ),
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "show_skills_levels",
+        "description": (
+            "Muestra un panorama visual de las skills destacadas de Rodrigo agrupadas por nivel de dominio "
+            "(avanzado/intermedio/básico). Úsala cuando pregunten por su nivel en tecnologías específicas o "
+            "quieran un panorama de su stack, no para la lista completa y plana de skills (para eso usa "
+            "`get_skills`). Muéstrala una sola vez por conversación -- si ya la mostraste, no la repitas."
         ),
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
@@ -126,6 +148,15 @@ def _show_ps_trophies_table(_: dict[str, Any]) -> dict[str, Any]:
     return build_ps_trophies_tool_result(trofeos)
 
 
+def _show_profile_card(_: dict[str, Any]) -> dict[str, Any]:
+    return build_profile_card_tool_result(load_profile())
+
+
+def _show_skills_levels(_: dict[str, Any]) -> dict[str, Any]:
+    habilidades_destacadas = load_profile().get("habilidades_destacadas", [])
+    return build_skills_levels_tool_result(habilidades_destacadas)
+
+
 _DISPATCH = {
     "get_summary": _get_summary,
     "get_experience": _get_experience,
@@ -135,6 +166,8 @@ _DISPATCH = {
     "get_contact": _get_contact,
     "get_ps_trophies": _get_ps_trophies,
     "show_ps_trophies_table": _show_ps_trophies_table,
+    "show_profile_card": _show_profile_card,
+    "show_skills_levels": _show_skills_levels,
 }
 
 
