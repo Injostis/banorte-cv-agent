@@ -12,6 +12,7 @@ from langfuse import observe
 from app.a2ui import (
     build_contact_card_tool_result,
     build_profile_card_tool_result,
+    build_project_architecture_tool_result,
     build_ps_trophies_tool_result,
     build_skills_levels_tool_result,
 )
@@ -124,6 +125,16 @@ TOOL_SCHEMAS: list[ToolParam] = [
         ),
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
+    {
+        "name": "show_project_architecture",
+        "description": (
+            "Muestra una tarjeta visual con las decisiones técnicas detrás de este mismo agente "
+            "(guardrails, A2UI, observabilidad, tools, diseño sin estado). Úsala cuando pregunten cómo está "
+            "construido el agente, qué tecnologías usa, o por sus decisiones de arquitectura -- distinto de "
+            "preguntas sobre la trayectoria profesional de Rodrigo. Muéstrala una sola vez por conversación."
+        ),
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
 ]
 
 
@@ -182,6 +193,10 @@ def _show_skills_levels(_: dict[str, Any]) -> dict[str, Any]:
     return build_skills_levels_tool_result(habilidades_destacadas)
 
 
+def _show_project_architecture(_: dict[str, Any]) -> dict[str, Any]:
+    return build_project_architecture_tool_result()
+
+
 _DISPATCH = {
     "get_summary": _get_summary,
     "get_experience": _get_experience,
@@ -194,6 +209,7 @@ _DISPATCH = {
     "show_profile_card": _show_profile_card,
     "show_contact_card": _show_contact_card,
     "show_skills_levels": _show_skills_levels,
+    "show_project_architecture": _show_project_architecture,
 }
 
 

@@ -100,6 +100,19 @@ def test_show_skills_levels_orders_by_level_with_filled_stars():
     assert any("Avanzado" in item["nombre_nivel"] for item in items)
 
 
+def test_show_project_architecture_lists_guardrails_and_a2ui():
+    result = execute_tool("show_project_architecture", {})
+    types = [part["type"] for part in result["content"]]
+    assert types == ["text", "resource"]
+
+    a2ui_messages = json.loads(result["content"][1]["resource"]["text"])
+    items = a2ui_messages[2]["updateDataModel"]["value"]["items"]
+    titulos = [item["titulo"] for item in items]
+    assert any("Guardrails" in t for t in titulos)
+    assert any("A2UI" in t for t in titulos)
+    assert any("RAG" in t for t in titulos)
+
+
 def test_unknown_tool_returns_error_dict_instead_of_raising():
     result = execute_tool("tool_que_no_existe", {})
     assert "error" in result

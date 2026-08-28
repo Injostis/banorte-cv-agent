@@ -28,6 +28,41 @@ _MESES_ES = (
     "ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic",
 )
 
+_ARCHITECTURE_ITEMS = [
+    {
+        "titulo": "Guardrails en dos capas",
+        "descripcion": (
+            "Entrada: regex + un clasificador de Claude bloquean intentos de manipular al agente. "
+            "Salida: otra verificación confirma que la respuesta esté respaldada por datos reales "
+            "antes de mandarse."
+        ),
+    },
+    {
+        "titulo": "Interfaz visual con A2UI",
+        "descripcion": (
+            "Las tarjetas que ves (como esta) se generan con este protocolo, con una versión en "
+            "texto por si el cliente no puede renderizarlas."
+        ),
+    },
+    {
+        "titulo": "Observabilidad con Langfuse",
+        "descripcion": "Cada llamada al modelo queda trazada: tokens, costo y latencia.",
+    },
+    {
+        "titulo": "Tools sobre datos propios, no RAG",
+        "descripcion": (
+            "11 tools leen secciones específicas de un perfil estructurado -- es chico, no un "
+            "corpus grande que justifique búsqueda semántica."
+        ),
+    },
+    {
+        "titulo": "Sin memoria propia",
+        "descripcion": (
+            "Cada mensaje llega con la conversación completa, así que no hace falta guardar nada entre turnos."
+        ),
+    },
+]
+
 
 def _new_surface_id(prefix: str) -> str:
     """Genera un id de superficie único, combinando el prefijo dado con un
@@ -315,5 +350,43 @@ def build_skills_levels_tool_result(habilidades_destacadas: list[dict[str, Any]]
 
     detalle = ", ".join(item["nombre_nivel"] for item in items)
     fallback = f"Un vistazo de mis skills destacadas por nivel de dominio: {detalle}."
+
+    return _tool_result(fallback, f"a2ui://banorte-cv-agent/{surface}", messages)
+
+
+def build_project_architecture_tool_result() -> dict[str, Any]:
+    """Arma el CallToolResult con un panorama de las decisiones técnicas
+    detrás de este agente (ver _ARCHITECTURE_ITEMS)."""
+    surface = _new_surface_id("architecture")
+
+    components: list[dict[str, Any]] = [
+        {"id": "root", "component": "Card", "child": "col"},
+        {"id": "col", "component": "Column", "children": ["title", "subtitle", "list"]},
+        {"id": "title", "component": "Text", "variant": "h3", "text": "Cómo está construido este agente"},
+        {
+            "id": "subtitle",
+            "component": "Text",
+            "variant": "caption",
+            "text": "Un vistazo rápido a las decisiones técnicas detrás de esta conversación.",
+        },
+        {
+            "id": "list",
+            "component": "List",
+            "direction": "vertical",
+            "children": {"path": "/architecture/items", "componentId": "item_row"},
+        },
+        {"id": "item_row", "component": "Column", "children": ["item_title", "item_desc"]},
+        {"id": "item_title", "component": "Text", "variant": "body", "text": {"path": "titulo"}},
+        {"id": "item_desc", "component": "Text", "variant": "caption", "text": {"path": "descripcion"}},
+    ]
+
+    messages = [
+        _create(surface, BASIC_CATALOG),
+        _components(surface, components),
+        _data(surface, "/architecture", {"items": _ARCHITECTURE_ITEMS}),
+    ]
+
+    resumen = "; ".join(item["titulo"] for item in _ARCHITECTURE_ITEMS)
+    fallback = f"Así está construido este agente: {resumen}."
 
     return _tool_result(fallback, f"a2ui://banorte-cv-agent/{surface}", messages)

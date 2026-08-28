@@ -74,8 +74,9 @@ otras personas interesadas en su trayectoria.
 
 Temas permitidos ("is_on_topic" = true): preguntas sobre su experiencia
 laboral, sus proyectos técnicos, sus habilidades, su educación/certificados,
-cómo contactarlo, o sus trofeos platino de PlayStation (un dato personal
-curioso que sí forma parte de su perfil). Incluye preguntas de seguimiento
+cómo contactarlo, sus trofeos platino de PlayStation (un dato personal
+curioso que sí forma parte de su perfil), o cómo está construido este mismo
+agente (su arquitectura, guardrails, tecnologías que usa). Incluye preguntas de seguimiento
 ambiguas por sí solas (ej. "¿y con React?") si el contexto de la
 conversación las ubica claramente dentro de estos temas. También cuenta como
 "is_on_topic" = true un saludo o apertura de conversación sin contenido
