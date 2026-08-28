@@ -85,19 +85,16 @@ def _fecha_corta(fecha_iso: str) -> str:
 def build_ps_trophies_tool_result(trofeos: list[dict[str, Any]]) -> dict[str, Any]:
     """Arma el CallToolResult completo (fallback + superficie A2UI) para
     los trofeos platino: total, y una tabla de los 5 más raros con el
-    nombre del trofeo y la fecha en que lo obtuvo.
-
-    Las filas se arman como componentes fijos (uno por trofeo, siempre son
-    5 como máximo) en vez de un template de lista, para que se estiren al
-    ancho completo de la tarjeta igual que el encabezado y el % quede
-    alineado en columna recta."""
+    nombre del trofeo y la fecha en que lo obtuvo."""
     surface = _new_surface_id("ps_trophies")
     top = sorted(trofeos, key=_rarity_value)[:5]
 
-    row_ids = [f"row{i}" for i in range(len(top))]
+    names_children = [f"juego{i}" if j == 0 else f"meta{i}" for i in range(len(top)) for j in range(2)]
+    pcts_children = [f"rareza{i}" if j == 0 else f"blank{i}" for i in range(len(top)) for j in range(2)]
+
     components: list[dict[str, Any]] = [
         {"id": "root", "component": "Card", "child": "col"},
-        {"id": "col", "component": "Column", "children": ["title", "total", "subtitle", "header", "sep", *row_ids]},
+        {"id": "col", "component": "Column", "children": ["title", "total", "subtitle", "header", "sep", "table"]},
         {"id": "title", "component": "Text", "variant": "h3", "text": "Trofeos platino de Rodrigo en PlayStation"},
         {"id": "total", "component": "Text", "variant": "body", "text": f"{len(trofeos)} platinos en total."},
         {
@@ -113,22 +110,22 @@ def build_ps_trophies_tool_result(trofeos: list[dict[str, Any]]) -> dict[str, An
         {"id": "header_juego", "component": "Text", "variant": "caption", "text": "Juego", "weight": 3},
         {"id": "header_pct", "component": "Text", "variant": "caption", "text": "% con el trofeo", "weight": 1},
         {"id": "sep", "component": "Divider"},
+        {"id": "table", "component": "Row", "justify": "spaceBetween", "children": ["names_col", "pcts_col"]},
+        {"id": "names_col", "component": "Column", "children": names_children, "weight": 3},
+        {"id": "pcts_col", "component": "Column", "children": pcts_children, "weight": 1},
     ]
 
     for i, trofeo in enumerate(top):
-        juego_col, juego, meta, rareza = f"juego_col{i}", f"juego{i}", f"meta{i}", f"rareza{i}"
         components.extend(
             [
-                {"id": row_ids[i], "component": "Row", "justify": "spaceBetween", "children": [juego_col, rareza]},
-                {"id": juego_col, "component": "Column", "children": [juego, meta], "weight": 3},
                 {
-                    "id": juego,
+                    "id": f"juego{i}",
                     "component": "Text",
                     "variant": "body",
                     "text": f"{trofeo.get('juego', '')} ({trofeo.get('plataforma', '')})",
                 },
                 {
-                    "id": meta,
+                    "id": f"meta{i}",
                     "component": "Text",
                     "variant": "caption",
                     "text": (
@@ -136,12 +133,12 @@ def build_ps_trophies_tool_result(trofeos: list[dict[str, Any]]) -> dict[str, An
                     ),
                 },
                 {
-                    "id": rareza,
+                    "id": f"rareza{i}",
                     "component": "Text",
                     "variant": "caption",
                     "text": f"{trofeo.get('porcentaje_jugadores_con_este_trofeo', '?')}%",
-                    "weight": 1,
                 },
+                {"id": f"blank{i}", "component": "Text", "variant": "caption", "text": " "},
             ]
         )
 

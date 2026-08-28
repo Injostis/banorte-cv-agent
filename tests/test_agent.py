@@ -81,6 +81,56 @@ def test_run_agent_runs_output_guardrail_with_tool_data_and_uses_its_result(monk
     assert result.final_text == "Respuesta corregida por el guardrail de salida."
 
 
+def test_run_agent_includes_prior_assistant_texts_in_grounding_context(monkeypatch):
+    tool_use = _FakeBlock(type="tool_use", id="call_1", name="get_skills", input={})
+    responses = [
+        _FakeResponse(stop_reason="tool_use", content=[tool_use]),
+        _FakeResponse(stop_reason="end_turn", content=[_FakeBlock(type="text", text="Sí, uso Python.")]),
+    ]
+    monkeypatch.setattr("app.agent.get_anthropic_client", lambda: _FakeClient(responses))
+    monkeypatch.setattr("app.agent.execute_tool", lambda name, tool_input: {"skills": ["Python"]})
+
+    captured: dict[str, Any] = {}
+
+    def _fake_check_output(final_text: str, tool_data: list[str]) -> str:
+        captured["tool_data"] = tool_data
+        return final_text
+
+    monkeypatch.setattr("app.agent.check_output", _fake_check_output)
+
+    conversation = [
+        {"role": "user", "content": "¿en qué trabajas?"},
+        {"role": "assistant", "content": "Trabajo en RYMA con Python en un sistema multiagente."},
+        {"role": "user", "content": "¿usas python?"},
+    ]
+    run_agent(conversation)
+
+    # El contexto de verificación incluye la respuesta previa del agente
+    # (ya respaldada por una tool en su propio turno) además de los datos
+    # de la tool de este turno.
+    assert "Trabajo en RYMA con Python en un sistema multiagente." in captured["tool_data"]
+    assert '{"skills": ["Python"]}' in captured["tool_data"]
+
+
+def test_run_agent_skips_output_guardrail_when_no_tool_used_this_turn(monkeypatch):
+    fake_response = _FakeResponse(stop_reason="end_turn", content=[_FakeBlock(type="text", text="¡De nada!")])
+    monkeypatch.setattr("app.agent.get_anthropic_client", lambda: _FakeClient(fake_response))
+
+    def _fail_if_called(*_args, **_kwargs):
+        raise AssertionError("check_output no debería llamarse sin tool en este turno")
+
+    monkeypatch.setattr("app.agent.check_output", _fail_if_called)
+
+    conversation = [
+        {"role": "user", "content": "¿dónde trabajas?"},
+        {"role": "assistant", "content": "Trabajo en RYMA."},
+        {"role": "user", "content": "gracias!"},
+    ]
+    result = run_agent(conversation)
+
+    assert result.final_text == "¡De nada!"
+
+
 def test_content_for_model_extracts_fallback_from_call_tool_result():
     output = {"content": [{"type": "text", "text": "Resumen visual."}, {"type": "resource", "resource": {}}]}
 

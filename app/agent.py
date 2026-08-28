@@ -194,12 +194,27 @@ def _content_for_model(output: dict[str, Any]) -> str:
     return json.dumps(output, ensure_ascii=False)
 
 
+def _prior_assistant_texts(messages: list[MessageParam]) -> list[str]:
+    """Respuestas previas del agente en la misma conversación (Banorte
+    reenvía la transcripción completa en cada request). El guardrail de
+    salida las usa como contexto adicional -- si una tool ya trajo un dato
+    real en un turno anterior, la respuesta de este turno puede apoyarse en
+    eso sin que se vea como no respaldada."""
+    texts = []
+    for message in messages:
+        content = message.get("content")
+        if message.get("role") == "assistant" and isinstance(content, str) and content.strip():
+            texts.append(content)
+    return texts
+
+
 @observe(as_type="agent", name="cv-agent-turn")
 def run_agent(messages: list[MessageParam]) -> AgentResult:
     client = get_anthropic_client()
     conversation: list[MessageParam] = list(messages)
     tool_calls: list[ToolCallRecord] = []
-    tool_data_for_grounding: list[str] = []
+    prior_context = _prior_assistant_texts(messages)
+    tool_data_this_turn: list[str] = []
 
     for _ in range(MAX_TOOL_TURNS):
         response = _call_claude(client, conversation)
@@ -214,12 +229,8 @@ def run_agent(messages: list[MessageParam]) -> AgentResult:
                     "run_agent: la respuesta del modelo no trajo texto (stop_reason=%s).", response.stop_reason
                 )
                 final_text = EMPTY_RESPONSE_FALLBACK
-            else:
-                # Segunda capa de defensa: verifica que lo que el modelo
-                # redactó esté respaldado por los datos de las tools que
-                # usó en este turno, no algo que haya agregado por su
-                # cuenta al armar la respuesta.
-                final_text = check_output(final_text, tool_data_for_grounding)
+            elif tool_data_this_turn:
+                final_text = check_output(final_text, [*prior_context, *tool_data_this_turn])
             return AgentResult(final_text=final_text, tool_calls=tool_calls)
 
         conversation.append({"role": "assistant", "content": response.content})
@@ -231,7 +242,7 @@ def run_agent(messages: list[MessageParam]) -> AgentResult:
             output = execute_tool(block.name, block.input)
             tool_calls.append(ToolCallRecord(name=block.name, input=block.input, output=output))
             content_for_model = _content_for_model(output)
-            tool_data_for_grounding.append(content_for_model)
+            tool_data_this_turn.append(content_for_model)
             tool_results_content.append(
                 {
                     "type": "tool_result",
