@@ -1,11 +1,7 @@
-"""Tests del guardrail de entrada.
+"""Tests de los guardrails de entrada y salida.
 
-El prefiltro de regex se prueba tal cual (gratis, determinista). La capa
-que llama a Claude se prueba con la llamada real mockeada -- no tiene
-sentido gastar tokens en cada corrida de la suite solo para confirmar que
-el guardrail interpreta bien la respuesta del clasificador; eso se
-verifica con ejecución real en el script de evaluación (scripts/eval.py) y
-manualmente antes de desplegar, como marca el plan de verificación.
+El prefiltro de regex se prueba directamente. La llamada a Claude se prueba
+con `_call_claude_classifier`/`_call_grounding_classifier` mockeados.
 """
 
 import pytest

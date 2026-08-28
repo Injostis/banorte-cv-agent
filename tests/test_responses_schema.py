@@ -90,9 +90,6 @@ def test_build_response_adds_a2ui_resource_part_for_ps_trophies():
 
     response = build_response(model="claude-sonnet-5", final_text="Tengo varios platinos.", tool_calls=tool_calls)
 
-    # El resultado de la tool (con su "resource" de A2UI adentro) va en el
-    # function_call_output asociado a la llamada, no en un item aparte --
-    # así el cliente lo asocia con la tool call que lo produjo.
     types = [item["type"] for item in response["output"]]
     assert types == ["function_call", "function_call_output", "message"]
 

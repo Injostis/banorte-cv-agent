@@ -1,9 +1,6 @@
 """Tools que el agente puede invocar sobre profile.yaml.
 
-Cada tool es un lookup de solo lectura sobre una sección de profile.yaml --
-nada de RAG ni embeddings: el perfil de una sola persona es lo bastante
-pequeño para no necesitarlo. El nombre y la descripción de cada tool
-importan de verdad: la UI de Banorte los muestra cuando el agente las usa.
+Cada tool es un lookup de solo lectura sobre una sección de profile.yaml.
 """
 
 import logging
@@ -166,9 +163,8 @@ def _get_ps_trophies(_: dict[str, Any]) -> dict[str, Any]:
 
 
 def _show_ps_trophies_table(_: dict[str, Any]) -> dict[str, Any]:
-    """Regresa un CallToolResult: un fallback en texto (lo que lee el
-    modelo) más un content part "resource" con la superficie A2UI (lo que
-    arma la respuesta visual). Ver app/a2ui.py."""
+    """Regresa un CallToolResult con la tabla de trofeos platino como
+    superficie A2UI. Ver app/a2ui.py."""
     trofeos = load_ps_trophies()
     return build_ps_trophies_tool_result(trofeos)
 
@@ -203,12 +199,10 @@ _DISPATCH = {
 
 @observe(as_type="tool", name="execute_tool")
 def execute_tool(name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
-    """Nunca deja que un fallo de una tool tumbe la conversación completa.
+    """Ejecuta la tool indicada por nombre y regresa su resultado.
 
-    Si profile.yaml llegara a faltar una clave esperada o a estar mal
-    formado, el modelo recibe un error legible en vez de que la request
-    entera truene -- puede reintentar, usar otra tool, o decirle al usuario
-    que tuvo un problema, en vez de que Banorte reciba un 500 crudo.
+    Si el nombre no está registrado o la tool lanza una excepción, regresa
+    un dict con la clave "error" en vez de propagar la excepción.
     """
     handler = _DISPATCH.get(name)
     if handler is None:

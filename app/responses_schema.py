@@ -1,11 +1,8 @@
 """Subconjunto propio del contrato Open Responses (openresponses.org).
 
-No se valida el spec completo -- solo lo que este agente necesita: items de
-tipo "message" en el input, y un output con items "function_call" (para que
-las tool calls se vean en la UI de Banorte) seguido de un "message" final.
-Deliberadamente tolerante en el parseo del input (acepta content como string
-o como lista de partes) para no rechazar variaciones válidas del cliente por
-un parseo demasiado estricto.
+Parsea items de tipo "message" en el input (acepta content como string o
+como lista de partes) y arma un output con items "function_call" por cada
+tool call, seguidos de un "message" final.
 """
 
 import json
@@ -52,13 +49,9 @@ def normalize_input(raw_input: list[dict[str, Any]] | str) -> list[dict[str, Any
 
 
 def to_anthropic_messages(items: list[dict[str, Any]]) -> list[MessageParam]:
-    """Convierte los items de input (Open Responses) a mensajes formato Anthropic.
-
-    Solo se traducen roles user/assistant -- un item de sistema/developer que
-    mande el cliente (el campo "Instrucciones" opcional de Banorte) se
-    ignora a propósito: el agente ya trae su propio system prompt completo
-    (ver app/agent.py) y no depende de que un tercero se lo complemente
-    correctamente en cada request.
+    """Convierte los items de input (Open Responses) a mensajes formato
+    Anthropic. Solo traduce items con role user/assistant; cualquier otro
+    role se ignora.
 
     Si un mensaje de usuario trae imágenes, se arma como contenido
     multi-parte (imagen(es) + texto si lo hay) en vez de solo texto plano.
@@ -116,9 +109,9 @@ def transcript_before_last_user(items: list[dict[str, Any]]) -> str:
 
 
 def _build_output_items(final_text: str, tool_calls: list[ToolCallRecord]) -> list[dict[str, Any]]:
-    """Arma la lista de items de "output" -- compartida entre la respuesta
-    completa (build_response) y la respuesta en streaming
-    (stream_response_events), para no duplicar esta lógica dos veces."""
+    """Arma la lista de items de "output": un par function_call/
+    function_call_output por cada tool call, seguidos del mensaje final del
+    asistente."""
     output: list[dict[str, Any]] = []
     for call in tool_calls:
         call_id = f"call_{uuid.uuid4().hex[:24]}"
@@ -133,12 +126,6 @@ def _build_output_items(final_text: str, tool_calls: list[ToolCallRecord]) -> li
             }
         )
 
-        # El resultado va en su propio item, referenciando el mismo call_id
-        # -- así el cliente asocia la llamada con su resultado y sabe que ya
-        # terminó. Si la tool regresó un CallToolResult (una superficie
-        # A2UI, ver app/a2ui.py), su content part "resource" (convención
-        # EmbeddedResource de MCP) viaja aquí dentro. `output` va como
-        # string JSON, no como objeto anidado.
         output.append(
             {
                 "id": f"fco_{uuid.uuid4().hex[:24]}",
@@ -173,9 +160,7 @@ def build_response(*, model: str, final_text: str, tool_calls: list[ToolCallReco
 
 def stream_response_events(*, model: str, final_text: str, tool_calls: list[ToolCallRecord]) -> Iterator[str]:
     """Genera la misma respuesta que build_response(), como una secuencia
-    de eventos SSE en vez de un JSON completo de una sola pieza. No es
-    streaming token por token real -- la respuesta ya está calculada
-    completa antes de emitirse como eventos."""
+    de eventos SSE en vez de un JSON completo de una sola pieza."""
     response_id = f"resp_{uuid.uuid4().hex[:24]}"
     created_at = int(time.time())
     output_items = _build_output_items(final_text, tool_calls)

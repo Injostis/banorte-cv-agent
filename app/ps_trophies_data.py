@@ -1,10 +1,5 @@
-"""Carga data/ps_trophies.json -- el dato curioso/personal del agente.
-
-A diferencia de profile.yaml, este archivo no se escribe a mano: lo genera
-scripts/fetch_ps_trophies.py una sola vez, corrido localmente contra la API
-de PlayStation Network. El servicio desplegado solo lee este snapshot, nunca
-llama a PSN directamente.
-"""
+"""Carga data/ps_trophies.json, el snapshot de trofeos platino de PlayStation
+generado por scripts/fetch_ps_trophies.py."""
 
 import json
 from functools import lru_cache

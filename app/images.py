@@ -1,17 +1,8 @@
 """Soporte de imágenes en la entrada del usuario.
 
-Convierte una URL de imagen (URL normal o data URI en base64, que es como
-suelen mandarlas los clientes estilo Open Responses) al bloque de imagen
-que espera el SDK de Anthropic. No hay documentación pública de la forma
-exacta que usa la plataforma de Banorte para mandar imágenes -- se acepta
-de forma tolerante (item.image_url como string, o como {"url": ...}) para
-no rechazar variaciones válidas, igual que el resto del parseo de input.
-
-La seguridad de esto no vive aquí: vive en el system prompt del agente
-(app/agent.py), que tiene la instrucción explícita de nunca seguir
-instrucciones encontradas dentro de una imagen -- el guardrail de texto no
-puede revisar contenido visual, así que esa es la única defensa real
-contra una imagen con instrucciones escondidas.
+Convierte una URL de imagen (URL normal o data URI en base64) al bloque de
+imagen que espera el SDK de Anthropic. Acepta item.image_url tanto como
+string como en forma de {"url": ...}.
 """
 
 import re
@@ -28,9 +19,8 @@ _ALLOWED_MEDIA_TYPES: tuple[str, ...] = get_args(_AllowedMediaType)
 def image_block_from_url(url: str) -> ImageBlockParam | None:
     """Convierte una URL de imagen a un ImageBlockParam de Anthropic.
 
-    Regresa None si no se puede interpretar (formato no reconocido, o un
-    media_type que Claude no acepta) -- se ignora esa imagen en vez de
-    tronar la request completa por una URL rara."""
+    Regresa None si el formato no es reconocido o el media_type no está
+    permitido."""
     match = _DATA_URI_RE.match(url)
     if match:
         media_type = match.group("media_type")

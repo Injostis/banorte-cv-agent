@@ -1,10 +1,8 @@
 """Evaluación offline manual: batería de preguntas reales contra el agente.
 
-No reemplaza a los tests unitarios (esos mockean todo para ser rápidos y
-deterministas) -- esto le pega de verdad a POST /responses, con la API real
-de Claude, para revisar tono, longitud, y que el guardrail se comporte bien
-en escenarios realistas antes de dar el agente por bueno. Sirve tanto contra
-el servicio local como contra la URL ya desplegada.
+Manda cada caso a POST /responses (servicio local o ya desplegado) y
+verifica tools usadas, rechazos de guardrail, y substrings esperados en la
+respuesta.
 
 Uso:
     # con el servicio corriendo en local (otra terminal: uv run uvicorn app.main:app)
@@ -138,7 +136,7 @@ def main() -> None:
 
     passed = sum(results)
     print(f"Resumen: {passed}/{len(results)} casos pasaron las verificaciones automáticas.")
-    print("El resto (tono, longitud, naturalidad) se revisa a ojo arriba -- eso no lo mide un assert.")
+    print("El resto (tono, longitud, naturalidad) se revisa a ojo arriba.")
 
     if passed != len(results):
         raise SystemExit(1)

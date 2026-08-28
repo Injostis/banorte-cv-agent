@@ -1,22 +1,16 @@
 """Construye superficies A2UI (https://a2ui.org, v0.9.1) para las tools que
 regresan resultados visuales, en vez de solo texto.
 
-El resultado de cada superficie se envuelve como un CallToolResult de MCP: un
-content part de texto (fallback en prosa, autocontenido) y uno de tipo
-"resource" (la convención EmbeddedResource de MCP) cuyo `resource.text` es la
-lista de mensajes A2UI serializada a JSON string -- no una lista anidada, y el
-CallToolResult completo se serializa a JSON string una vez más al armar la
-respuesta (ver app/responses_schema.py) -- así sobrevive intacto sin importar
-qué capa lo transporte.
+El resultado de cada superficie se envuelve como un CallToolResult de MCP:
+un content part de texto (fallback en prosa) y uno de tipo "resource" cuyo
+`resource.text` es la lista de mensajes A2UI serializada a JSON string.
 
 Cada superficie son exactamente 3 mensajes: createSurface, updateComponents
-y updateDataModel (los valores reales, publicados aparte).
+y updateDataModel.
 
-Solo se usan componentes del catálogo básico v0.9.1, ya verificado en vivo --
-no existe un componente de gráfica ahí, así que un ranking se muestra como
-tabla (filas fijas, ver más abajo) y un nivel de dominio se aproxima con
-iconos de estrella (el catálogo básico sí trae "star"/"starOff" en su lista
-de iconos).
+Los componentes usados vienen del catálogo básico v0.9.1: un ranking se
+muestra como tabla (dos columnas de texto) y un nivel de dominio se
+representa con iconos de estrella ("star"/"starOff").
 """
 
 import json
@@ -36,10 +30,8 @@ _MESES_ES = (
 
 
 def _new_surface_id(prefix: str) -> str:
-    """Un id único por llamada, no uno fijo por tipo de superficie -- si la
-    misma tool se invoca más de una vez en la conversación, cada llamada
-    crea su propia superficie en vez de reapuntar (mover) una ya existente
-    con el mismo id."""
+    """Genera un id de superficie único, combinando el prefijo dado con un
+    sufijo aleatorio."""
     return f"{prefix}_{uuid.uuid4().hex[:8]}"
 
 
@@ -162,11 +154,7 @@ def build_ps_trophies_tool_result(trofeos: list[dict[str, Any]]) -> dict[str, An
 def build_profile_card_tool_result(profile: dict[str, Any]) -> dict[str, Any]:
     """Arma el CallToolResult con la tarjeta de perfil: nombre, título,
     resumen, skills avanzadas, correo como texto, y botones de GitHub/
-    LinkedIn.
-
-    El correo va como texto plano en vez de un botón de acción, ya que la
-    función `openUrl` del catálogo está pensada para links `http(s)://`,
-    no para esquemas como `mailto:`."""
+    LinkedIn."""
     surface = _new_surface_id("profile")
     contacto = profile["contacto"]
     avanzadas = [h["nombre"] for h in profile.get("habilidades_destacadas", []) if h.get("nivel") == "avanzado"]
@@ -233,9 +221,7 @@ def build_profile_card_tool_result(profile: dict[str, Any]) -> dict[str, Any]:
 
 def build_contact_card_tool_result(profile: dict[str, Any]) -> dict[str, Any]:
     """Arma el CallToolResult con una tarjeta chica de contacto: nombre,
-    correo como texto, y botones de GitHub/LinkedIn -- sin resumen ni
-    skills, para preguntas puntuales de cómo contactarlo (a diferencia de
-    build_profile_card_tool_result, que es la vista general completa)."""
+    correo como texto, y botones de GitHub/LinkedIn."""
     surface = _new_surface_id("contact")
     contacto = profile["contacto"]
 
@@ -285,7 +271,7 @@ def _star_icons(score: int) -> dict[str, str]:
 def build_skills_levels_tool_result(habilidades_destacadas: list[dict[str, Any]]) -> dict[str, Any]:
     """Arma el CallToolResult con el panorama visual de skills destacadas
     por nivel de dominio, usando 3 iconos de estrella por skill (llenas
-    según el nivel) -- no interactivo, a diferencia de un Slider."""
+    según el nivel)."""
     surface = _new_surface_id("skills")
 
     components: list[dict[str, Any]] = [

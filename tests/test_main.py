@@ -1,8 +1,5 @@
-"""Tests del endpoint POST /responses. run_agent y check_input se mockean
-aquí -- esto prueba el contrato HTTP (auth, shape del request/response), no
-la calidad de las respuestas del modelo. Eso lo cubre scripts/eval.py contra
-la API real.
-"""
+"""Tests del endpoint POST /responses: auth y forma del request/response.
+run_agent y check_input se mockean."""
 
 from fastapi.testclient import TestClient
 
@@ -85,9 +82,6 @@ def test_guardrail_rejection_returns_200_with_rejection_text_not_an_error(monkey
 
 
 def test_unexpected_agent_failure_does_not_return_a_raw_500(monkeypatch):
-    """Si la API de Claude truena (timeout, rate limit, lo que sea), el
-    endpoint debe seguir regresando una respuesta bien formada en vez de un
-    500 crudo que Banorte no sabría mostrar."""
     monkeypatch.setattr("app.main.check_input", lambda message, context: None)
 
     def _boom(messages):

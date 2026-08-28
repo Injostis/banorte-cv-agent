@@ -59,8 +59,7 @@ def test_show_profile_card_includes_github_and_linkedin_buttons():
     actions = [c["action"]["functionCall"]["args"]["url"] for c in components if c.get("component") == "Button"]
     assert any("linkedin.com" in url for url in actions)
     assert any("github.com" in url for url in actions)
-    # El correo va como texto plano, no como botón de acción -- openUrl con
-    # un link mailto: depende de que el host lo soporte.
+    # El correo va como texto plano, no como botón de acción.
     assert not any(url.startswith("mailto:") for url in actions)
 
 

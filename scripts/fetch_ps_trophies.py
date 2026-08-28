@@ -1,12 +1,5 @@
-"""Ingesta única de trofeos platino desde PlayStation Network.
-
-Este script NO forma parte del servicio desplegado -- se corre a mano, en tu
-máquina, una sola vez (o cada que quieras actualizar la lista), y guarda un
-snapshot en data/ps_trophies.json que la tool get_ps_trophies lee en
-producción. El agente desplegado nunca llama a la API de PSN: así se evita
-tanto el riesgo de que un uso repetido/automatizado termine en una
-suspensión de tu cuenta (la propia librería lo advierte), como depender de
-un token que expira cada ~2 meses en el servicio que Banorte va a probar.
+"""Descarga los trofeos platino desde PlayStation Network y los guarda como
+snapshot en data/ps_trophies.json, que la tool get_ps_trophies lee.
 
 Uso:
     1. Inicia sesión en https://my.playstation.com/
@@ -40,13 +33,8 @@ OUTPUT_PATH = Path(__file__).resolve().parent.parent / "data" / "ps_trophies.jso
 def _find_earned_platinum(
     client: Client, np_communication_id: str, platforms: frozenset[PlatformType]
 ) -> tuple[TrophyWithProgress, PlatformType] | None:
-    """Prueba cada plataforma del título hasta encontrar el platino.
-
-    Un título puede existir en más de una plataforma (ej. PS4 y PS5), y solo
-    una de ellas suele tener el set de trofeos consultable -- si la primera
-    que se prueba falla o no tiene el platino, se sigue con las demás antes
-    de rendirse.
-    """
+    """Recorre las plataformas dadas y regresa el trofeo platino ganado (y
+    su plataforma) en la primera que lo tenga, o None si ninguna lo tiene."""
     last_error: Exception | None = None
     for platform in platforms:
         try:
@@ -87,10 +75,6 @@ def main() -> None:
         try:
             result = _find_earned_platinum(client, title.np_communication_id, title.title_platform)
         except Exception as exc:
-            # Algunos títulos (ediciones retiradas de la tienda, colecciones
-            # con metadata rota, etc.) truenan al pedir su detalle de
-            # trofeos en TODAS sus plataformas -- un juego problemático no
-            # debe perder el trabajo ya hecho en todos los demás.
             print(f"SKIP: {title.title_name} ({exc.__class__.__name__})", file=sys.stderr)
             continue
 

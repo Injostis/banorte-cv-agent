@@ -33,9 +33,7 @@ init_langfuse()
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     yield
-    # Las trazas de Langfuse se mandan en lote, no al instante -- sin este
-    # flush, las últimas quedarían en el buffer y se perderían cuando
-    # Render reinicia o redespliega la instancia.
+    # Envía las trazas de Langfuse pendientes en el buffer.
     get_client().flush()
 
 
@@ -61,11 +59,8 @@ def health() -> dict[str, str]:
 
 @app.get("/.well-known/agent-card.json")
 def agent_card(request: Request) -> dict[str, Any]:
-    """Tarjeta de agente (protocolo A2A). Declara el soporte experimental de
-    A2UI vía capabilities.extensions -- sin esta declaración, un cliente
-    que sí sabe renderizar A2UI podría no buscarlo siquiera en las
-    respuestas. Pública a propósito (sin auth): así es como funciona el
-    descubrimiento de agentes."""
+    """Tarjeta de agente (protocolo A2A), sin autenticación. Declara el
+    soporte de A2UI vía capabilities.extensions."""
     base_url = str(request.base_url).rstrip("/")
     return {
         "protocolVersion": "0.3.0",
@@ -132,10 +127,7 @@ def create_response(request: ResponsesRequest) -> Any:
     if not user_text and not has_image:
         raise HTTPException(status_code=400, detail="No se encontró un mensaje de usuario en 'input'.")
 
-    # El guardrail de texto no tiene nada que clasificar en un mensaje que
-    # es solo una imagen sin texto -- se salta, y la seguridad para ese
-    # caso recae en la regla del system prompt de nunca seguir
-    # instrucciones encontradas dentro de una imagen (ver app/agent.py).
+    # El guardrail solo clasifica texto; un mensaje que es solo imagen lo salta.
     if user_text:
         context = transcript_before_last_user(items)
         try:
@@ -149,10 +141,6 @@ def create_response(request: ResponsesRequest) -> Any:
     try:
         result = run_agent(messages)
     except Exception:
-        # Red de seguridad general: un timeout/rate-limit/error transitorio de
-        # la API de Claude, o cualquier otro fallo inesperado, nunca debe
-        # llegar a Banorte como un 500 crudo -- el chat debe poder mostrar
-        # algo coherente y el usuario debe poder reintentar.
         logger.exception("Fallo inesperado ejecutando el agente.")
         return _respond(
             request,

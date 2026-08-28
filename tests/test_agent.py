@@ -1,6 +1,5 @@
 """Tests del loop de tool-use. La llamada a Claude se mockea con objetos
-mínimos que imitan la forma real de una respuesta del SDK -- no se gastan
-tokens reales en cada corrida.
+mínimos que imitan la forma real de una respuesta del SDK.
 """
 
 import json
@@ -105,9 +104,6 @@ def test_run_agent_includes_prior_assistant_texts_in_grounding_context(monkeypat
     ]
     run_agent(conversation)
 
-    # El contexto de verificación incluye la respuesta previa del agente
-    # (ya respaldada por una tool en su propio turno) además de los datos
-    # de la tool de este turno.
     assert "Trabajo en RYMA con Python en un sistema multiagente." in captured["tool_data"]
     assert '{"skills": ["Python"]}' in captured["tool_data"]
 

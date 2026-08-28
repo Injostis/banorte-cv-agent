@@ -2,9 +2,7 @@
 """Loop de tool-use del agente de CV sobre el SDK de Anthropic.
 
 El modelo pide una tool, el código la ejecuta, se le regresa el resultado, y
-se repite hasta tener una respuesta final. Es un solo agente sin
-orquestador -- para un perfil de una sola persona no hace falta algo como
-LangGraph, un loop de una sola pieza es suficiente.
+se repite hasta tener una respuesta final.
 """
 
 import json
@@ -24,8 +22,7 @@ from app.tools import TOOL_SCHEMAS, execute_tool
 
 logger = logging.getLogger(__name__)
 
-# Freno contra loops infinitos: un tope duro decidido desde el diseño, no
-# agregado después de que algo se puso en loop.
+# Número máximo de turnos de tool-use antes de forzar una respuesta final.
 MAX_TOOL_TURNS = 5
 
 EMPTY_RESPONSE_FALLBACK = "No logré armar una respuesta clara a eso. ¿Puedes reformular la pregunta?"
@@ -168,13 +165,13 @@ def _call_claude(client: Anthropic, conversation: list[MessageParam]) -> Message
 
 
 def _content_for_model(output: dict[str, Any]) -> str:
-    """Lo que el modelo lee del resultado de una tool.
+    """Convierte el resultado de una tool en el string que se le manda al
+    modelo como tool_result.
 
-    Si la tool regresó un CallToolResult (una superficie A2UI adjunta, ver
-    app/a2ui.py), el modelo no necesita ver el JSON completo de la
-    superficie -- solo el resumen en texto, para que su respuesta sea
-    interpretación breve y no repita los datos que la superficie ya
-    muestra visualmente.
+    Si la tool regresó un CallToolResult (una superficie A2UI, ver
+    app/a2ui.py), extrae solo su content part de texto y lo envuelve junto
+    con una nota indicando que la tabla ya se muestra visualmente. En
+    cualquier otro caso, serializa el output completo a JSON.
     """
     content = output.get("content")
     if isinstance(content, list):
@@ -195,11 +192,8 @@ def _content_for_model(output: dict[str, Any]) -> str:
 
 
 def _prior_assistant_texts(messages: list[MessageParam]) -> list[str]:
-    """Respuestas previas del agente en la misma conversación (Banorte
-    reenvía la transcripción completa en cada request). El guardrail de
-    salida las usa como contexto adicional -- si una tool ya trajo un dato
-    real en un turno anterior, la respuesta de este turno puede apoyarse en
-    eso sin que se vea como no respaldada."""
+    """Extrae los textos de los mensajes del asistente en la conversación
+    recibida."""
     texts = []
     for message in messages:
         content = message.get("content")
@@ -222,9 +216,6 @@ def run_agent(messages: list[MessageParam]) -> AgentResult:
         if response.stop_reason != "tool_use":
             final_text = "".join(block.text for block in response.content if block.type == "text")
             if not final_text.strip():
-                # Puede pasar que el modelo termine sin generar ningún bloque
-                # de texto (poco común, pero real). Un mensaje vacío se vería
-                # como una respuesta rota en el chat -- nunca se manda tal cual.
                 logger.warning(
                     "run_agent: la respuesta del modelo no trajo texto (stop_reason=%s).", response.stop_reason
                 )

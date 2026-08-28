@@ -1,20 +1,12 @@
 """Guardrail de entrada: injection + fuera de tema en una sola pasada.
 
-Un solo agente no necesita categorías de ruteo que clasificar -- la única
-pregunta relevante es "¿es sobre la trayectoria profesional de Rodrigo o
-no?". Sin la librería Guardrails AI de por medio: para este alcance no
-aporta nada que un validador propio no resuelva, y evita depender de un
-índice de paquetes privado adicional.
-
 Dos capas, en este orden:
-1. Prefiltro de regex (gratis, corre primero) para frases típicas de
-   injection.
-2. Si el regex no encuentra nada, una sola llamada a Claude con tool use
-   forzado que clasifica injection y fuera-de-tema a la vez.
+1. Prefiltro de regex para frases típicas de injection.
+2. Si el regex no encuentra nada, una llamada a Claude con tool use forzado
+   que clasifica injection y fuera-de-tema a la vez.
 
-Fail-closed: si la llamada a Claude falla o no regresa los campos
-esperados, se rechaza el mensaje. Nunca se asume "todo bien" ante una
-respuesta que no se pudo interpretar.
+Si la llamada a Claude falla o no regresa los campos esperados, se rechaza
+el mensaje.
 """
 
 import logging
@@ -119,11 +111,8 @@ Responde únicamente usando la tool proporcionada."""
 class GuardrailRejection(Exception):
     """Se levanta cuando el guardrail de entrada rechaza un mensaje.
 
-    `user_message` es lo único que se le muestra al usuario -- para
-    intentos de injection deliberadamente no se le regresa el razonamiento
-    interno del clasificador (evita darle a un atacante señal de qué
-    detectó exactamente para poder iterar). `internal_reason` es solo para
-    logs.
+    `user_message` es el mensaje que se le muestra al usuario.
+    `internal_reason` es el motivo de la clasificación, para logs.
     """
 
     def __init__(self, user_message: str, internal_reason: str = "") -> None:
@@ -168,10 +157,9 @@ def _call_claude_classifier(message: str, context: str) -> dict[str, Any]:
 
 @observe(as_type="guardrail", name="input-guardrail")
 def check_input(message: str, context: str = "") -> None:
-    """Levanta GuardrailRejection si el mensaje no debe procesarse.
-
-    Fail-closed: cualquier fallo al clasificar (error de red, respuesta sin
-    los campos esperados) se trata como rechazo, nunca como "pasa".
+    """Levanta GuardrailRejection si el mensaje no debe procesarse: intento
+    de injection, o pregunta fuera del tema de la trayectoria de Rodrigo.
+    Cualquier fallo al clasificar también se trata como rechazo.
     """
     if INJECTION_REGEX.search(message):
         raise GuardrailRejection(
@@ -273,17 +261,10 @@ def _call_grounding_classifier(final_text: str, tool_data: str) -> dict[str, Any
 @observe(as_type="guardrail", name="output-guardrail")
 def check_output(final_text: str, tool_data: list[str]) -> str:
     """Verifica que la respuesta final esté respaldada por los datos de las
-    tools usadas en el turno -- una segunda capa de defensa contra que el
-    modelo invente o distorsione algo al redactar la respuesta.
-
-    Si no se usó ninguna tool en el turno no hay contra qué verificar (es
-    plática casual o una respuesta honesta de "no tengo esa información"),
-    así que se deja pasar sin llamar al clasificador.
-
-    A diferencia del guardrail de entrada, un fallo al clasificar aquí NO
-    bloquea la respuesta (fail-open): es una verificación de calidad, no de
-    seguridad -- tumbar una respuesta válida por un error transitorio de
-    red costaría más de lo que el riesgo justifica.
+    tools usadas en el turno. Si no se usó ninguna tool, regresa el texto
+    tal cual sin clasificar. Si la clasificación falla o marca la
+    respuesta como no respaldada, regresa GROUNDING_FALLBACK; si falla la
+    llamada al clasificador, regresa el texto original.
     """
     if not tool_data:
         return final_text
@@ -291,7 +272,7 @@ def check_output(final_text: str, tool_data: list[str]) -> str:
     try:
         result = _call_grounding_classifier(final_text, "\n---\n".join(tool_data))
     except Exception:
-        logger.exception("Guardrail de salida: fallo al clasificar; se deja pasar la respuesta (fail-open).")
+        logger.exception("Guardrail de salida: fallo al clasificar.")
         return final_text
 
     if not result.get("is_grounded", True):

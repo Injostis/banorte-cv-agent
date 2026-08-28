@@ -1,9 +1,4 @@
-"""Carga profile.yaml como la única fuente de verdad del agente.
-
-Las tools en app/tools.py leen únicamente de aquí -- nunca del conocimiento
-general del modelo. Si un dato no está en profile.yaml, no existe para el
-agente.
-"""
+"""Carga profile.yaml, el perfil de Rodrigo usado por las tools del agente."""
 
 from functools import lru_cache
 from typing import Any
