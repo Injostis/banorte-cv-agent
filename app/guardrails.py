@@ -192,3 +192,104 @@ def check_input(message: str, context: str = "") -> None:
 
     if not result.get("is_on_topic", False):
         raise GuardrailRejection(OFF_TOPIC_MESSAGE, internal_reason=result.get("reason", ""))
+
+
+CLASSIFY_GROUNDING_TOOL: ToolParam = {
+    "name": "classify_grounding",
+    "description": (
+        "Verifica si una respuesta generada por el agente está respaldada por los datos "
+        "de las tools que se usaron para construirla."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "is_grounded": {
+                "type": "boolean",
+                "description": (
+                    "True si cada afirmación factual de la respuesta está respaldada por los datos "
+                    "proporcionados, sin inventar ni agregar información que no esté ahí."
+                ),
+            },
+            "reason": {
+                "type": "string",
+                "description": "Explicación breve (una oración) de la clasificación.",
+            },
+        },
+        "required": ["is_grounded", "reason"],
+    },
+}
+
+GROUNDING_PROMPT = """Eres un verificador de fidelidad para un agente conversacional que
+representa el perfil profesional de Rodrigo. Tu única tarea es comparar una
+respuesta generada contra los datos reales que el agente consultó para
+construirla.
+
+Datos disponibles (la única fuente de verdad válida para esta respuesta):
+{tool_data}
+
+Respuesta generada por el agente:
+"{final_text}"
+
+Marca "is_grounded" = false únicamente si la respuesta afirma algo factual
+sobre la trayectoria, los proyectos, las habilidades, la educación, el
+contacto o los trofeos de Rodrigo que NO esté respaldado por los datos de
+arriba -- por ejemplo, una empresa, fecha, tecnología o cifra que no
+aparece ahí. NO la marques como falsa solo por resumir, interpretar,
+reordenar o parafrasear los mismos datos, ni por incluir cortesías,
+preguntas de seguimiento o comentarios conversacionales que no afirman
+nada factual nuevo.
+
+Responde únicamente usando la tool proporcionada."""
+
+GROUNDING_FALLBACK = (
+    "Ese detalle no me quedó del todo claro con la información que tengo a la mano -- "
+    "¿podrías reformular la pregunta?"
+)
+
+
+@observe(as_type="generation", name="output-guardrail-claude-call")
+def _call_grounding_classifier(final_text: str, tool_data: str) -> dict[str, Any]:
+    prompt = GROUNDING_PROMPT.format(tool_data=tool_data, final_text=final_text)
+    messages: list[MessageParam] = [{"role": "user", "content": prompt}]
+    client = get_anthropic_client()
+    response = client.messages.create(
+        model=settings.claude_model,
+        max_tokens=300,
+        tools=[CLASSIFY_GROUNDING_TOOL],
+        tool_choice={"type": "tool", "name": "classify_grounding"},
+        messages=messages,
+    )
+    record_usage(response, settings.claude_model)
+    tool_block = next(block for block in response.content if block.type == "tool_use")
+    return dict(tool_block.input)
+
+
+@observe(as_type="guardrail", name="output-guardrail")
+def check_output(final_text: str, tool_data: list[str]) -> str:
+    """Verifica que la respuesta final esté respaldada por los datos de las
+    tools usadas en el turno -- una segunda capa de defensa contra que el
+    modelo invente o distorsione algo al redactar la respuesta.
+
+    Si no se usó ninguna tool en el turno no hay contra qué verificar (es
+    plática casual o una respuesta honesta de "no tengo esa información"),
+    así que se deja pasar sin llamar al clasificador.
+
+    A diferencia del guardrail de entrada, un fallo al clasificar aquí NO
+    bloquea la respuesta (fail-open): es una verificación de calidad, no de
+    seguridad -- tumbar una respuesta válida por un error transitorio de
+    red costaría más de lo que el riesgo justifica.
+    """
+    if not tool_data:
+        return final_text
+
+    try:
+        result = _call_grounding_classifier(final_text, "\n---\n".join(tool_data))
+    except Exception:
+        logger.exception("Guardrail de salida: fallo al clasificar; se deja pasar la respuesta (fail-open).")
+        return final_text
+
+    if not result.get("is_grounded", True):
+        logger.warning("Guardrail de salida rechazó una respuesta. Motivo: %s", result.get("reason", ""))
+        return GROUNDING_FALLBACK
+
+    return final_text

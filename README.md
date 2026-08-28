@@ -9,10 +9,19 @@ plataforma del reto para hablar con cualquier agente que registres.
 ## Qué hace
 
 Contesta con base en un perfil estructurado (`data/profile.yaml`), nunca
-inventando datos — si algo no está ahí, lo dice. Tiene un guardrail de
-entrada que solo deja pasar preguntas sobre mi trayectoria (más un dato
-curioso personal, ver más abajo) y rechaza intentos de manipular sus
-instrucciones.
+inventando datos — si algo no está ahí, lo dice. Además de texto:
+
+- Muestra tarjetas visuales ([A2UI](https://a2ui.org)) para el perfil, las
+  skills por nivel y los trofeos de PlayStation, con respaldo en texto
+  siempre por si el cliente no puede renderizarlas.
+- Acepta imágenes en la entrada (las comenta, nunca sigue instrucciones que
+  vengan de dentro de una).
+- Responde en modo normal o streaming (SSE), según lo pida el cliente.
+
+Tiene dos guardrails: uno de entrada (solo deja pasar preguntas sobre mi
+trayectoria y rechaza intentos de manipular sus instrucciones) y uno de
+salida (verifica que la respuesta esté respaldada por los datos que la
+tool trajo ese turno, antes de mandarla).
 
 No es un sistema RAG, ni tiene un orquestador tipo LangGraph, ni base de
 datos — decisiones a propósito, no por default.
@@ -26,13 +35,18 @@ Banorte  --POST /responses-->  FastAPI
                                   ├─ guardrail de entrada (regex + Claude)
                                   |     └─ si rechaza, responde ahí mismo
                                   ├─ loop de tool-use con Claude
-                                  |     └─ tools leen profile.yaml / ps_trophies.json
-                                  └─ arma la respuesta en formato Open Responses
+                                  |     ├─ tools leen profile.yaml / ps_trophies.json
+                                  |     └─ algunas regresan una superficie A2UI
+                                  ├─ guardrail de salida (verifica lo que se
+                                  |     va a decir contra los datos usados)
+                                  └─ arma la respuesta (Open Responses,
+                                        normal o streaming)
 ```
 
 Todo corre en un solo proceso, sin más servicios externos que la API de
-Anthropic. `app/responses_schema.py` es la única pieza que sabe que existe
-el protocolo Open Responses — el resto trabaja con texto plano.
+Anthropic (y Langfuse, opcional, para trazas). `app/responses_schema.py` es
+la única pieza que sabe que existe el protocolo Open Responses — el resto
+trabaja con texto plano y estructuras propias.
 
 ## Decisiones técnicas
 
@@ -43,20 +57,30 @@ el protocolo Open Responses — el resto trabaja con texto plano.
   les pide, siempre.
 - **Sin estado, sin base de datos.** Cada request se resuelve solo con lo
   que trae, sin depender de nada guardado de antes.
-- **Guardrail en dos capas.** Un filtro de regex rápido primero, y si no
-  encuentra nada, una llamada a Claude que clasifica intento de
+- **Guardrail de entrada en dos capas.** Un filtro de regex rápido primero,
+  y si no encuentra nada, una llamada a Claude que clasifica intento de
   manipulación y si el tema es válido. Si esa llamada falla, se rechaza —
-  nunca se asume que pasó.
+  nunca se asume que pasó (fail-closed).
+- **Guardrail de salida, pero fail-open.** Verifica que la respuesta final
+  no invente nada fuera de los datos que las tools trajeron ese turno. A
+  diferencia del de entrada, un fallo al clasificar aquí no bloquea la
+  respuesta: es una verificación de calidad, no de seguridad, y tumbar una
+  respuesta válida por un error transitorio de red cuesta más de lo que
+  el riesgo justifica.
+- **A2UI solo con el catálogo básico.** Nada de componentes exóticos sin
+  verificar — cada superficie se probó en vivo contra la plataforma real
+  antes de darla por buena.
 
 ## Cómo se verificó
 
-24 tests (`tests/`) cubren el contrato HTTP, el guardrail y las tools, con
-las llamadas a Claude mockeadas para que corran rápido.
+53 tests (`tests/`) cubren el contrato HTTP, ambos guardrails, las tools y
+las superficies A2UI, con las llamadas a Claude mockeadas para que corran
+rápido y sin costo.
 
-`scripts/eval_agent.py` corre una batería de 15 preguntas reales contra el
+`scripts/eval_agent.py` corre una batería de preguntas reales contra el
 servicio de verdad, con la API real — puntuales, amplias, fuera de tema, un
-intento de injection, seguimiento ambiguo. No es solo cosmético: la primera
-corrida encontró un problema real que los tests unitarios no atrapan (un
+intento de injection, seguimiento ambiguo. No es solo cosmético: encontró
+más de un problema real que los tests unitarios no atrapan (por ejemplo, un
 simple "hola" se estaba rechazando como fuera de tema), y quedó corregido
 antes de seguir.
 
@@ -84,10 +108,13 @@ Langfuse para trazas/costos (opcional).
 
 ```
 app/
-  main.py              endpoint HTTP, auth, orquesta guardrail + agente
-  agent.py             system prompt y loop de tool-use
-  guardrails.py        guardrail de entrada (regex + clasificador)
+  main.py              endpoint HTTP, auth, agent card, orquesta todo
+  agent.py             system prompt, loop de tool-use, guardrail de salida
+  guardrails.py        guardrail de entrada y de salida
   tools.py             las tools que el agente puede llamar
+  a2ui.py               construye las superficies A2UI (perfil, skills, trofeos)
+  images.py            soporte de imágenes en la entrada
+  observability.py     integración con Langfuse
   responses_schema.py  traducción hacia/desde el formato Open Responses
   profile_data.py      carga profile.yaml
   ps_trophies_data.py  carga ps_trophies.json
@@ -98,7 +125,7 @@ data/
 scripts/
   fetch_ps_trophies.py ingesta única contra la API de PSN
   eval_agent.py        batería de preguntas reales contra el servicio
-tests/                 24 tests, API mockeada
+tests/                 53 tests, API mockeada
 ```
 
 ## Correrlo en local

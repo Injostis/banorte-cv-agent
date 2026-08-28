@@ -45,7 +45,12 @@ TOOL_SCHEMAS: list[ToolParam] = [
     },
     {
         "name": "get_skills",
-        "description": "Obtiene las habilidades técnicas (lenguajes, frameworks, herramientas) e idiomas de Rodrigo.",
+        "description": (
+            "Obtiene la lista completa y plana de habilidades técnicas (lenguajes, frameworks, herramientas) e "
+            "idiomas de Rodrigo, sin nivel de dominio. Úsala SOLO si piden explícitamente la lista completa (ej. "
+            "'dame todas tus skills'). Para cualquier otra pregunta de skills ('¿qué tecnologías usas?', '¿en qué "
+            "tienes más nivel?', '¿qué tan bien manejas X?') usa mejor `show_skills_levels`."
+        ),
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
     {
@@ -56,7 +61,10 @@ TOOL_SCHEMAS: list[ToolParam] = [
     {
         "name": "get_contact",
         "description": (
-            "Obtiene la información de contacto pública de Rodrigo (correo, ubicación, proyectos públicos con URL)."
+            "Obtiene la información de contacto pública de Rodrigo (correo, ubicación, proyectos públicos con "
+            "URL). Úsala SOLO para algo que `show_profile_card` no cubra, como preguntar por un proyecto público "
+            "específico (ej. Muralea). Para '¿cómo te contacto?', '¿cuál es tu correo?' o pedir LinkedIn/GitHub, "
+            "usa mejor `show_profile_card` -- ya incluye los tres como botones."
         ),
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
@@ -85,10 +93,11 @@ TOOL_SCHEMAS: list[ToolParam] = [
     {
         "name": "show_profile_card",
         "description": (
-            "Muestra una tarjeta visual con el nombre, título, resumen, skills avanzadas y botones de GitHub/"
-            "LinkedIn de Rodrigo. Úsala al inicio de la conversación o cuando pidan una vista general de su perfil "
-            "('¿quién eres?', '¿me compartes tu LinkedIn/GitHub?'). Muéstrala una sola vez por conversación -- si "
-            "ya la mostraste, no la repitas, solo refiérete a ella."
+            "Muestra una tarjeta visual con el nombre, título, resumen, skills avanzadas y botones de contacto "
+            "(correo, GitHub, LinkedIn) de Rodrigo. Úsala al inicio de la conversación, cuando pidan una vista "
+            "general de su perfil, o para CUALQUIER pregunta de cómo contactarlo (correo, LinkedIn, GitHub) -- ya "
+            "incluye los tres como botones, así que no hace falta dictarlos como texto plano. Muéstrala una sola "
+            "vez por conversación -- si ya la mostraste, no la repitas, solo refiérete a ella."
         ),
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
@@ -96,9 +105,10 @@ TOOL_SCHEMAS: list[ToolParam] = [
         "name": "show_skills_levels",
         "description": (
             "Muestra un panorama visual de las skills destacadas de Rodrigo agrupadas por nivel de dominio "
-            "(avanzado/intermedio/básico). Úsala cuando pregunten por su nivel en tecnologías específicas o "
-            "quieran un panorama de su stack, no para la lista completa y plana de skills (para eso usa "
-            "`get_skills`). Muéstrala una sola vez por conversación -- si ya la mostraste, no la repitas."
+            "(avanzado/intermedio/básico), con estrellas por skill. Úsala para CUALQUIER pregunta "
+            "sobre sus skills o stack técnico, general o puntual (ej. '¿qué tecnologías usas?', '¿en qué tienes "
+            "más nivel?') -- solo usa `get_skills` si piden explícitamente la lista completa y plana, sin nivel. "
+            "Muéstrala una sola vez por conversación -- si ya la mostraste, no la repitas."
         ),
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },

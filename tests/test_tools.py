@@ -59,18 +59,28 @@ def test_show_profile_card_includes_github_and_linkedin_buttons():
     actions = [c["action"]["functionCall"]["args"]["url"] for c in components if c.get("component") == "Button"]
     assert any("linkedin.com" in url for url in actions)
     assert any("github.com" in url for url in actions)
+    # El correo va como texto plano, no como botón de acción -- openUrl con
+    # un link mailto: depende de que el host lo soporte.
+    assert not any(url.startswith("mailto:") for url in actions)
+    data_value = a2ui_messages[2]["updateDataModel"]["value"]
+    assert "rod06@hotmail.es" in data_value["email_texto"]
 
 
-def test_show_skills_levels_orders_by_score_descending():
+def test_show_skills_levels_orders_by_level_with_filled_stars():
     result = execute_tool("show_skills_levels", {})
     types = [part["type"] for part in result["content"]]
     assert types == ["text", "resource"]
 
     a2ui_messages = json.loads(result["content"][1]["resource"]["text"])
     items = a2ui_messages[2]["updateDataModel"]["value"]["items"]
-    scores = [item["score"] for item in items]
-    assert scores == sorted(scores, reverse=True)
-    assert any(item["nivel_texto"] == "Avanzado" for item in items)
+
+    def filled_stars(item: dict) -> int:
+        return sum(1 for i in (1, 2, 3) if item[f"icon{i}"] == "star")
+
+    star_counts = [filled_stars(item) for item in items]
+    assert star_counts == sorted(star_counts, reverse=True)
+    assert star_counts[0] == 3  # avanzado -- las 3 estrellas llenas
+    assert any("Avanzado" in item["nombre_nivel"] for item in items)
 
 
 def test_unknown_tool_returns_error_dict_instead_of_raising():

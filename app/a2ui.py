@@ -10,18 +10,17 @@ respuesta (ver app/responses_schema.py) -- así sobrevive intacto sin importar
 qué capa lo transporte.
 
 Cada superficie son exactamente 3 mensajes: createSurface, updateComponents
-(los componentes referencian datos con {"path": "..."}, no con valores
-literales) y updateDataModel (los valores reales, publicados aparte). Dentro
-de un template de lista (children con "componentId"+"path"), los paths de los
-componentes hijos son relativos al item de la iteración -- sin "/" inicial.
+y updateDataModel (los valores reales, publicados aparte).
 
-Solo se usan componentes del catálogo básico v0.9.1 -- no existe un
-componente de gráfica ahí, así que un ranking se muestra como tabla
-(List + Text) y un nivel de dominio se aproxima con un Slider de solo
-lectura (el componente más parecido a una barra que ofrece el catálogo).
+Solo se usan componentes del catálogo básico v0.9.1, ya verificado en vivo --
+no existe un componente de gráfica ahí, así que un ranking se muestra como
+tabla (filas fijas, ver más abajo) y un nivel de dominio se aproxima con
+iconos de estrella (el catálogo básico sí trae "star"/"starOff" en su lista
+de iconos).
 """
 
 import json
+from datetime import datetime
 from typing import Any
 
 A2UI_MIME_TYPE = "application/a2ui+json"
@@ -30,6 +29,9 @@ BASIC_CATALOG = "https://a2ui.org/specification/v0_9_1/catalogs/basic/catalog.js
 
 _NIVEL_SCORE = {"avanzado": 3, "intermedio": 2, "basico": 1}
 _NIVEL_LABEL = {"avanzado": "Avanzado", "intermedio": "Intermedio", "basico": "Básico"}
+_MESES_ES = (
+    "ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic",
+)
 
 
 def _create(surface_id: str, catalog_id: str) -> dict[str, Any]:
@@ -63,60 +65,89 @@ def _rarity_value(trofeo: dict[str, Any]) -> float:
         return 100.0
 
 
+def _fecha_corta(fecha_iso: str) -> str:
+    try:
+        dt = datetime.fromisoformat(fecha_iso)
+    except (TypeError, ValueError):
+        return ""
+    return f"{_MESES_ES[dt.month - 1]} {dt.year}"
+
+
 def build_ps_trophies_tool_result(trofeos: list[dict[str, Any]]) -> dict[str, Any]:
     """Arma el CallToolResult completo (fallback + superficie A2UI) para
-    los 5 platinos más raros, como una tabla con encabezado."""
+    los trofeos platino: total, y una tabla de los 5 más raros con el
+    nombre del trofeo y la fecha en que lo obtuvo.
+
+    Las filas se arman como componentes fijos (uno por trofeo, siempre son
+    5 como máximo) en vez de un template de lista, para que se estiren al
+    ancho completo de la tarjeta igual que el encabezado y el % quede
+    alineado en columna recta."""
     surface = "ps_trophies"
     top = sorted(trofeos, key=_rarity_value)[:5]
 
+    row_ids = [f"row{i}" for i in range(len(top))]
     components: list[dict[str, Any]] = [
         {"id": "root", "component": "Card", "child": "col"},
-        {"id": "col", "component": "Column", "children": ["title", "subtitle", "header", "sep", "list"]},
-        {"id": "title", "component": "Text", "variant": "h3", "text": "Platinos más raros de Rodrigo en PlayStation"},
+        {"id": "col", "component": "Column", "children": ["title", "total", "subtitle", "header", "sep", *row_ids]},
+        {"id": "title", "component": "Text", "variant": "h3", "text": "Trofeos platino de Rodrigo en PlayStation"},
+        {"id": "total", "component": "Text", "variant": "body", "text": f"{len(trofeos)} platinos en total."},
         {
             "id": "subtitle",
             "component": "Text",
             "variant": "caption",
-            "text": "% = jugadores en el mundo que también tienen ese trofeo -- entre más bajo, más raro.",
+            "text": (
+                "Los 5 más raros -- % = jugadores en el mundo que también tienen ese trofeo, entre más bajo, "
+                "más raro."
+            ),
         },
         {"id": "header", "component": "Row", "justify": "spaceBetween", "children": ["header_juego", "header_pct"]},
         {"id": "header_juego", "component": "Text", "variant": "caption", "text": "Juego", "weight": 3},
         {"id": "header_pct", "component": "Text", "variant": "caption", "text": "% con el trofeo", "weight": 1},
         {"id": "sep", "component": "Divider"},
-        {
-            "id": "list",
-            "component": "List",
-            "direction": "vertical",
-            "children": {"path": "/ps_trophies/items", "componentId": "row"},
-        },
-        {"id": "row", "component": "Row", "justify": "spaceBetween", "children": ["juego", "rareza"]},
-        # Dentro del template de "list", los paths son relativos al item de la
-        # iteración -- sin "/" inicial. Con "/" se leerían como ruta absoluta
-        # desde la raíz del modelo de datos, donde no existen.
-        {"id": "juego", "component": "Text", "variant": "body", "text": {"path": "juego"}, "weight": 3},
-        {"id": "rareza", "component": "Text", "variant": "caption", "text": {"path": "rareza"}, "weight": 1},
     ]
 
-    items = [
-        {
-            "juego": f"{trofeo.get('juego', '')} ({trofeo.get('plataforma', '')})",
-            "rareza": f"{trofeo.get('porcentaje_jugadores_con_este_trofeo', '?')}%",
-        }
-        for trofeo in top
-    ]
+    for i, trofeo in enumerate(top):
+        juego_col, juego, meta, rareza = f"juego_col{i}", f"juego{i}", f"meta{i}", f"rareza{i}"
+        components.extend(
+            [
+                {"id": row_ids[i], "component": "Row", "justify": "spaceBetween", "children": [juego_col, rareza]},
+                {"id": juego_col, "component": "Column", "children": [juego, meta], "weight": 3},
+                {
+                    "id": juego,
+                    "component": "Text",
+                    "variant": "body",
+                    "text": f"{trofeo.get('juego', '')} ({trofeo.get('plataforma', '')})",
+                },
+                {
+                    "id": meta,
+                    "component": "Text",
+                    "variant": "caption",
+                    "text": (
+                        f"\"{trofeo.get('nombre_trofeo', '')}\" · {_fecha_corta(trofeo.get('fecha_platino', ''))}"
+                    ),
+                },
+                {
+                    "id": rareza,
+                    "component": "Text",
+                    "variant": "caption",
+                    "text": f"{trofeo.get('porcentaje_jugadores_con_este_trofeo', '?')}%",
+                    "weight": 1,
+                },
+            ]
+        )
 
     messages = [
         _create(surface, BASIC_CATALOG),
         _components(surface, components),
-        _data(surface, "/ps_trophies", {"items": items}),
+        _data(surface, "/", {}),
     ]
 
     destacados = ", ".join(
         f"{t.get('juego', '')} ({t.get('porcentaje_jugadores_con_este_trofeo', '?')}%)" for t in top[:3]
     )
     fallback = (
-        f"Mis 5 platinos más raros en PlayStation, por porcentaje de jugadores que también lo tienen: {destacados}, "
-        "entre otros."
+        f"Tengo {len(trofeos)} platinos en total. Los 5 más raros, por porcentaje de jugadores que también lo "
+        f"tienen: {destacados}, entre otros."
     )
 
     return _tool_result(fallback, f"a2ui://banorte-cv-agent/{surface}", messages)
@@ -124,7 +155,12 @@ def build_ps_trophies_tool_result(trofeos: list[dict[str, Any]]) -> dict[str, An
 
 def build_profile_card_tool_result(profile: dict[str, Any]) -> dict[str, Any]:
     """Arma el CallToolResult con la tarjeta de perfil: nombre, título,
-    resumen, skills avanzadas y botones de GitHub/LinkedIn."""
+    resumen, skills avanzadas, correo como texto, y botones de GitHub/
+    LinkedIn.
+
+    El correo va como texto plano en vez de un botón de acción, ya que la
+    función `openUrl` del catálogo está pensada para links `http(s)://`,
+    no para esquemas como `mailto:`."""
     surface = "profile"
     contacto = profile["contacto"]
     avanzadas = [h["nombre"] for h in profile.get("habilidades_destacadas", []) if h.get("nivel") == "avanzado"]
@@ -135,7 +171,7 @@ def build_profile_card_tool_result(profile: dict[str, Any]) -> dict[str, Any]:
         {
             "id": "col",
             "component": "Column",
-            "children": ["name", "headline", "summary", "sep", "skills_title", "skills", "sep2", "links"],
+            "children": ["name", "headline", "summary", "sep", "skills_title", "skills", "email", "sep2", "links"],
         },
         {"id": "name", "component": "Text", "variant": "h3", "text": {"path": "/profile/name"}},
         {"id": "headline", "component": "Text", "variant": "caption", "text": {"path": "/profile/headline"}},
@@ -143,6 +179,7 @@ def build_profile_card_tool_result(profile: dict[str, Any]) -> dict[str, Any]:
         {"id": "sep", "component": "Divider"},
         {"id": "skills_title", "component": "Text", "variant": "h5", "text": "Skills avanzadas"},
         {"id": "skills", "component": "Text", "variant": "body", "text": {"path": "/profile/skills"}},
+        {"id": "email", "component": "Text", "variant": "caption", "text": {"path": "/profile/email_texto"}},
         {"id": "sep2", "component": "Divider"},
         {"id": "links", "component": "Row", "justify": "start", "children": ["gh", "li"]},
         {
@@ -175,21 +212,27 @@ def build_profile_card_tool_result(profile: dict[str, Any]) -> dict[str, Any]:
                 "headline": headline,
                 "summary": profile["resumen"].strip(),
                 "skills": skills_text,
+                "email_texto": f"Correo: {contacto['email']}",
             },
         ),
     ]
 
     fallback = (
         f"{profile['nombre']} -- {headline}. {profile['resumen'].strip()} "
-        f"Skills avanzadas: {skills_text}. GitHub: {contacto['repo_github']}. LinkedIn: {contacto['linkedin']}."
+        f"Skills avanzadas: {skills_text}. Correo: {contacto['email']}. GitHub: {contacto['repo_github']}. "
+        f"LinkedIn: {contacto['linkedin']}."
     )
     return _tool_result(fallback, f"a2ui://banorte-cv-agent/{surface}", messages)
 
 
+def _star_icons(score: int) -> dict[str, str]:
+    return {f"icon{i}": ("star" if i <= score else "starOff") for i in (1, 2, 3)}
+
+
 def build_skills_levels_tool_result(habilidades_destacadas: list[dict[str, Any]]) -> dict[str, Any]:
     """Arma el CallToolResult con el panorama visual de skills destacadas
-    por nivel de dominio, usando un Slider de solo lectura como pseudo-barra
-    (el catálogo básico no trae un componente de gráfica)."""
+    por nivel de dominio, usando 3 iconos de estrella por skill (llenas
+    según el nivel) -- no interactivo, a diferencia de un Slider."""
     surface = "skills"
 
     components: list[dict[str, Any]] = [
@@ -208,26 +251,22 @@ def build_skills_levels_tool_result(habilidades_destacadas: list[dict[str, Any]]
             "direction": "vertical",
             "children": {"path": "/skills/items", "componentId": "skill_row"},
         },
-        {
-            "id": "skill_row",
-            "component": "Row",
-            "justify": "spaceBetween",
-            "children": ["skill_name", "skill_bar", "skill_level"],
-        },
-        {"id": "skill_name", "component": "Text", "variant": "body", "text": {"path": "nombre"}, "weight": 2},
-        {"id": "skill_bar", "component": "Slider", "value": {"path": "score"}, "min": 0, "max": 3, "weight": 3},
-        {"id": "skill_level", "component": "Text", "variant": "caption", "text": {"path": "nivel_texto"}, "weight": 1},
+        # Dentro del template, los paths son relativos al item -- sin "/" inicial,
+        # incluyendo los de "stars" (subárbol anidado dentro del template).
+        {"id": "skill_row", "component": "Row", "justify": "spaceBetween", "children": ["skill_name", "stars"]},
+        {"id": "skill_name", "component": "Text", "variant": "body", "text": {"path": "nombre_nivel"}, "weight": 3},
+        {"id": "stars", "component": "Row", "justify": "end", "children": ["star1", "star2", "star3"], "weight": 1},
+        {"id": "star1", "component": "Icon", "name": {"path": "icon1"}},
+        {"id": "star2", "component": "Icon", "name": {"path": "icon2"}},
+        {"id": "star3", "component": "Icon", "name": {"path": "icon3"}},
     ]
 
     ordered = sorted(habilidades_destacadas, key=lambda h: -_NIVEL_SCORE.get(h.get("nivel", ""), 0))
-    items = [
-        {
-            "nombre": h["nombre"],
-            "score": _NIVEL_SCORE.get(h.get("nivel", ""), 0),
-            "nivel_texto": _NIVEL_LABEL.get(h.get("nivel", ""), h.get("nivel", "")),
-        }
-        for h in ordered
-    ]
+    items: list[dict[str, Any]] = []
+    for h in ordered:
+        score = _NIVEL_SCORE.get(h.get("nivel", ""), 0)
+        nivel_texto = _NIVEL_LABEL.get(h.get("nivel", ""), h.get("nivel", ""))
+        items.append({"nombre_nivel": f"{h['nombre']} — {nivel_texto}", **_star_icons(score)})
 
     messages = [
         _create(surface, BASIC_CATALOG),
@@ -235,7 +274,7 @@ def build_skills_levels_tool_result(habilidades_destacadas: list[dict[str, Any]]
         _data(surface, "/skills", {"items": items}),
     ]
 
-    detalle = ", ".join(f"{item['nombre']} ({item['nivel_texto']})" for item in items)
+    detalle = ", ".join(item["nombre_nivel"] for item in items)
     fallback = f"Un vistazo de mis skills destacadas por nivel de dominio: {detalle}."
 
     return _tool_result(fallback, f"a2ui://banorte-cv-agent/{surface}", messages)

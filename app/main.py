@@ -111,9 +111,7 @@ def agent_card(request: Request) -> dict[str, Any]:
 
 def _respond(request: ResponsesRequest, *, final_text: str, tool_calls: list[ToolCallRecord]) -> Any:
     """Arma la respuesta final, completa o en streaming según lo haya
-    pedido el cliente (`request.stream`). El camino sin streaming -- el que
-    ya usa Banorte hoy -- no cambia: sigue siendo exactamente build_response().
-    """
+    pedido el cliente (`request.stream`)."""
     if request.stream:
         logger.info("Respondiendo en modo STREAMING (request.stream=true).")
         return StreamingResponse(

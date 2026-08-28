@@ -10,7 +10,14 @@ manualmente antes de desplegar, como marca el plan de verificación.
 
 import pytest
 
-from app.guardrails import GENERIC_INJECTION_MESSAGE, OFF_TOPIC_MESSAGE, GuardrailRejection, check_input
+from app.guardrails import (
+    GENERIC_INJECTION_MESSAGE,
+    GROUNDING_FALLBACK,
+    OFF_TOPIC_MESSAGE,
+    GuardrailRejection,
+    check_input,
+    check_output,
+)
 
 
 def test_regex_prefilter_blocks_obvious_injection_without_calling_claude():
@@ -44,3 +51,38 @@ def test_classifier_failure_fails_closed(monkeypatch):
     monkeypatch.setattr("app.guardrails._call_claude_classifier", _raise)
     with pytest.raises(GuardrailRejection):
         check_input("¿cuál es tu experiencia con React?")
+
+
+def test_check_output_skips_classifier_without_tool_data(monkeypatch):
+    def _fail_if_called(*_args, **_kwargs):
+        raise AssertionError("no debería llamar al clasificador sin datos de tools")
+
+    monkeypatch.setattr("app.guardrails._call_grounding_classifier", _fail_if_called)
+    assert check_output("¡Hola! ¿En qué te puedo ayudar?", []) == "¡Hola! ¿En qué te puedo ayudar?"
+
+
+def test_check_output_passes_grounded_response(monkeypatch):
+    monkeypatch.setattr(
+        "app.guardrails._call_grounding_classifier",
+        lambda final_text, tool_data: {"is_grounded": True, "reason": "coincide con los datos"},
+    )
+    text = "Trabajo en RYMA desde 2024."
+    assert check_output(text, ['{"empresa": "RYMA", "periodo": "2024-presente"}']) == text
+
+
+def test_check_output_replaces_ungrounded_response(monkeypatch):
+    monkeypatch.setattr(
+        "app.guardrails._call_grounding_classifier",
+        lambda final_text, tool_data: {"is_grounded": False, "reason": "menciona una empresa que no está en los datos"},
+    )
+    result = check_output("Trabajo en Google desde 2024.", ['{"empresa": "RYMA", "periodo": "2024-presente"}'])
+    assert result == GROUNDING_FALLBACK
+
+
+def test_check_output_classifier_failure_fails_open(monkeypatch):
+    def _raise(*_args, **_kwargs):
+        raise RuntimeError("fallo de red simulado")
+
+    monkeypatch.setattr("app.guardrails._call_grounding_classifier", _raise)
+    text = "Trabajo en RYMA desde 2024."
+    assert check_output(text, ['{"empresa": "RYMA"}']) == text

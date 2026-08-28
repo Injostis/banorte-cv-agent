@@ -133,19 +133,12 @@ def _build_output_items(final_text: str, tool_calls: list[ToolCallRecord]) -> li
             }
         )
 
-        # El resultado de la tool se manda como su propio item, referenciando
-        # el mismo call_id -- sin este item, un cliente no tiene forma de
-        # saber que la llamada ya terminó (se queda mostrándola como
-        # pendiente) ni de ver el resultado. Si la tool regresó un
-        # CallToolResult (una superficie A2UI, ver app/a2ui.py), su content
-        # part "resource" (convención EmbeddedResource de MCP) viaja aquí
-        # dentro, no como un item aparte -- así el cliente lo encuentra
-        # asociado a la llamada que lo produjo.
-        #
-        # `output` va como string JSON (no como objeto anidado): así es como
-        # lo espera un cliente que arma este campo serializando el resultado
-        # de la tool con json.dumps antes de guardarlo -- un objeto anidado
-        # ahí no sobrevive ese contrato.
+        # El resultado va en su propio item, referenciando el mismo call_id
+        # -- así el cliente asocia la llamada con su resultado y sabe que ya
+        # terminó. Si la tool regresó un CallToolResult (una superficie
+        # A2UI, ver app/a2ui.py), su content part "resource" (convención
+        # EmbeddedResource de MCP) viaja aquí dentro. `output` va como
+        # string JSON, no como objeto anidado.
         output.append(
             {
                 "id": f"fco_{uuid.uuid4().hex[:24]}",
@@ -179,14 +172,10 @@ def build_response(*, model: str, final_text: str, tool_calls: list[ToolCallReco
 
 
 def stream_response_events(*, model: str, final_text: str, tool_calls: list[ToolCallRecord]) -> Iterator[str]:
-    """Genera la misma respuesta que build_response(), como eventos SSE en
-    vez de un JSON completo de una sola pieza. No es streaming token por
-    token real -- la respuesta ya está calculada completa; se entrega como
-    una secuencia corta de eventos porque el render de una superficie A2UI
-    del lado del cliente parece requerir el camino de streaming, no el de
-    respuesta completa (mismo contenido exacto, comportamiento distinto
-    entre los dos caminos, probado en vivo).
-    """
+    """Genera la misma respuesta que build_response(), como una secuencia
+    de eventos SSE en vez de un JSON completo de una sola pieza. No es
+    streaming token por token real -- la respuesta ya está calculada
+    completa antes de emitirse como eventos."""
     response_id = f"resp_{uuid.uuid4().hex[:24]}"
     created_at = int(time.time())
     output_items = _build_output_items(final_text, tool_calls)
