@@ -12,7 +12,12 @@ from typing import Any
 from anthropic.types import ToolParam
 from langfuse import observe
 
-from app.a2ui import build_profile_card_tool_result, build_ps_trophies_tool_result, build_skills_levels_tool_result
+from app.a2ui import (
+    build_contact_card_tool_result,
+    build_profile_card_tool_result,
+    build_ps_trophies_tool_result,
+    build_skills_levels_tool_result,
+)
 from app.profile_data import load_profile
 from app.ps_trophies_data import load_ps_trophies
 
@@ -62,9 +67,8 @@ TOOL_SCHEMAS: list[ToolParam] = [
         "name": "get_contact",
         "description": (
             "Obtiene la información de contacto pública de Rodrigo (correo, ubicación, proyectos públicos con "
-            "URL). Úsala SOLO para algo que `show_profile_card` no cubra, como preguntar por un proyecto público "
-            "específico (ej. Muralea). Para '¿cómo te contacto?', '¿cuál es tu correo?' o pedir LinkedIn/GitHub, "
-            "usa mejor `show_profile_card` -- ya incluye los tres como botones."
+            "URL). Úsala SOLO para algo puntual que ni `show_contact_card` ni `show_profile_card` cubran, como "
+            "preguntar por un proyecto público específico (ej. Muralea)."
         ),
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
@@ -93,11 +97,22 @@ TOOL_SCHEMAS: list[ToolParam] = [
     {
         "name": "show_profile_card",
         "description": (
-            "Muestra una tarjeta visual con el nombre, título, resumen, skills avanzadas y botones de contacto "
-            "(correo, GitHub, LinkedIn) de Rodrigo. Úsala al inicio de la conversación, cuando pidan una vista "
-            "general de su perfil, o para CUALQUIER pregunta de cómo contactarlo (correo, LinkedIn, GitHub) -- ya "
-            "incluye los tres como botones, así que no hace falta dictarlos como texto plano. Muéstrala una sola "
-            "vez por conversación -- si ya la mostraste, no la repitas, solo refiérete a ella."
+            "Muestra una tarjeta visual con el nombre, título, resumen, skills avanzadas y datos de contacto de "
+            "Rodrigo. Úsala al inicio de la conversación (en tu primera respuesta, sin importar qué tan casual "
+            "sea el mensaje de apertura) o cuando pidan una vista general de su perfil. Para preguntas puntuales "
+            "de cómo contactarlo usa mejor `show_contact_card` -- es más chica, sin repetir el resumen completo. "
+            "Muéstrala una sola vez por conversación -- si ya la mostraste, no la repitas, solo refiérete a ella."
+        ),
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "show_contact_card",
+        "description": (
+            "Muestra una tarjeta chica solo con el correo y botones de GitHub/LinkedIn de Rodrigo, sin resumen ni "
+            "skills. Úsala para CUALQUIER pregunta puntual de cómo contactarlo ('¿cómo te contacto?', '¿cuál es "
+            "tu correo?', '¿me compartes tu LinkedIn/GitHub?'). Si ya mostraste `show_profile_card` en esta "
+            "conversación (que también incluye el correo y los botones), no hace falta usar esta -- solo "
+            "refiérete a la que ya se mostró. Muéstrala una sola vez por conversación."
         ),
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
@@ -162,6 +177,10 @@ def _show_profile_card(_: dict[str, Any]) -> dict[str, Any]:
     return build_profile_card_tool_result(load_profile())
 
 
+def _show_contact_card(_: dict[str, Any]) -> dict[str, Any]:
+    return build_contact_card_tool_result(load_profile())
+
+
 def _show_skills_levels(_: dict[str, Any]) -> dict[str, Any]:
     habilidades_destacadas = load_profile().get("habilidades_destacadas", [])
     return build_skills_levels_tool_result(habilidades_destacadas)
@@ -177,6 +196,7 @@ _DISPATCH = {
     "get_ps_trophies": _get_ps_trophies,
     "show_ps_trophies_table": _show_ps_trophies_table,
     "show_profile_card": _show_profile_card,
+    "show_contact_card": _show_contact_card,
     "show_skills_levels": _show_skills_levels,
 }
 

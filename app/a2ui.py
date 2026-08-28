@@ -20,6 +20,7 @@ de iconos).
 """
 
 import json
+import uuid
 from datetime import datetime
 from typing import Any
 
@@ -32,6 +33,14 @@ _NIVEL_LABEL = {"avanzado": "Avanzado", "intermedio": "Intermedio", "basico": "B
 _MESES_ES = (
     "ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic",
 )
+
+
+def _new_surface_id(prefix: str) -> str:
+    """Un id único por llamada, no uno fijo por tipo de superficie -- si la
+    misma tool se invoca más de una vez en la conversación, cada llamada
+    crea su propia superficie en vez de reapuntar (mover) una ya existente
+    con el mismo id."""
+    return f"{prefix}_{uuid.uuid4().hex[:8]}"
 
 
 def _create(surface_id: str, catalog_id: str) -> dict[str, Any]:
@@ -82,7 +91,7 @@ def build_ps_trophies_tool_result(trofeos: list[dict[str, Any]]) -> dict[str, An
     5 como máximo) en vez de un template de lista, para que se estiren al
     ancho completo de la tarjeta igual que el encabezado y el % quede
     alineado en columna recta."""
-    surface = "ps_trophies"
+    surface = _new_surface_id("ps_trophies")
     top = sorted(trofeos, key=_rarity_value)[:5]
 
     row_ids = [f"row{i}" for i in range(len(top))]
@@ -161,7 +170,7 @@ def build_profile_card_tool_result(profile: dict[str, Any]) -> dict[str, Any]:
     El correo va como texto plano en vez de un botón de acción, ya que la
     función `openUrl` del catálogo está pensada para links `http(s)://`,
     no para esquemas como `mailto:`."""
-    surface = "profile"
+    surface = _new_surface_id("profile")
     contacto = profile["contacto"]
     avanzadas = [h["nombre"] for h in profile.get("habilidades_destacadas", []) if h.get("nivel") == "avanzado"]
     skills_text = ", ".join(avanzadas)
@@ -225,6 +234,53 @@ def build_profile_card_tool_result(profile: dict[str, Any]) -> dict[str, Any]:
     return _tool_result(fallback, f"a2ui://banorte-cv-agent/{surface}", messages)
 
 
+def build_contact_card_tool_result(profile: dict[str, Any]) -> dict[str, Any]:
+    """Arma el CallToolResult con una tarjeta chica de contacto: nombre,
+    correo como texto, y botones de GitHub/LinkedIn -- sin resumen ni
+    skills, para preguntas puntuales de cómo contactarlo (a diferencia de
+    build_profile_card_tool_result, que es la vista general completa)."""
+    surface = _new_surface_id("contact")
+    contacto = profile["contacto"]
+
+    components: list[dict[str, Any]] = [
+        {"id": "root", "component": "Card", "child": "col"},
+        {"id": "col", "component": "Column", "children": ["name", "email", "sep", "links"]},
+        {"id": "name", "component": "Text", "variant": "h5", "text": {"path": "/contact/name"}},
+        {"id": "email", "component": "Text", "variant": "body", "text": {"path": "/contact/email_texto"}},
+        {"id": "sep", "component": "Divider"},
+        {"id": "links", "component": "Row", "justify": "start", "children": ["gh", "li"]},
+        {
+            "id": "gh",
+            "component": "Button",
+            "variant": "default",
+            "child": "gh_t",
+            "action": {"functionCall": {"call": "openUrl", "args": {"url": contacto["repo_github"]}}},
+        },
+        {"id": "gh_t", "component": "Text", "text": "GitHub"},
+        {
+            "id": "li",
+            "component": "Button",
+            "variant": "default",
+            "child": "li_t",
+            "action": {"functionCall": {"call": "openUrl", "args": {"url": contacto["linkedin"]}}},
+        },
+        {"id": "li_t", "component": "Text", "text": "LinkedIn"},
+    ]
+
+    messages = [
+        _create(surface, BASIC_CATALOG),
+        _components(surface, components),
+        _data(
+            surface,
+            "/contact",
+            {"name": profile["nombre"], "email_texto": f"Correo: {contacto['email']}"},
+        ),
+    ]
+
+    fallback = f"Correo: {contacto['email']}. GitHub: {contacto['repo_github']}. LinkedIn: {contacto['linkedin']}."
+    return _tool_result(fallback, f"a2ui://banorte-cv-agent/{surface}", messages)
+
+
 def _star_icons(score: int) -> dict[str, str]:
     return {f"icon{i}": ("star" if i <= score else "starOff") for i in (1, 2, 3)}
 
@@ -233,7 +289,7 @@ def build_skills_levels_tool_result(habilidades_destacadas: list[dict[str, Any]]
     """Arma el CallToolResult con el panorama visual de skills destacadas
     por nivel de dominio, usando 3 iconos de estrella por skill (llenas
     según el nivel) -- no interactivo, a diferencia de un Slider."""
-    surface = "skills"
+    surface = _new_surface_id("skills")
 
     components: list[dict[str, Any]] = [
         {"id": "root", "component": "Card", "child": "col"},

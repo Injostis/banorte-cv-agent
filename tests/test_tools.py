@@ -62,6 +62,24 @@ def test_show_profile_card_includes_github_and_linkedin_buttons():
     # El correo va como texto plano, no como botón de acción -- openUrl con
     # un link mailto: depende de que el host lo soporte.
     assert not any(url.startswith("mailto:") for url in actions)
+
+
+def test_show_contact_card_is_leaner_than_profile_card():
+    result = execute_tool("show_contact_card", {})
+    types = [part["type"] for part in result["content"]]
+    assert types == ["text", "resource"]
+    assert "github.com" in result["content"][0]["text"]
+    assert "linkedin.com" in result["content"][0]["text"]
+
+    a2ui_messages = json.loads(result["content"][1]["resource"]["text"])
+    components = a2ui_messages[1]["updateComponents"]["components"]
+    component_types = [c["component"] for c in components]
+    # Sin resumen ni skills -- solo nombre, correo, y los dos botones.
+    assert "Divider" in component_types
+    assert component_types.count("Button") == 2
+    actions = [c["action"]["functionCall"]["args"]["url"] for c in components if c.get("component") == "Button"]
+    assert any("linkedin.com" in url for url in actions)
+    assert any("github.com" in url for url in actions)
     data_value = a2ui_messages[2]["updateDataModel"]["value"]
     assert "rod06@hotmail.es" in data_value["email_texto"]
 

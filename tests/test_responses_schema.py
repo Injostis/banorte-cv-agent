@@ -104,11 +104,12 @@ def test_build_response_adds_a2ui_resource_part_for_ps_trophies():
     resource_part = json.loads(output_item["output"])["content"][1]
     assert resource_part["type"] == "resource"
     assert resource_part["resource"]["mimeType"] == "application/a2ui+json"
-    assert resource_part["resource"]["uri"] == "a2ui://banorte-cv-agent/ps_trophies"
+    assert resource_part["resource"]["uri"].startswith("a2ui://banorte-cv-agent/ps_trophies")
     a2ui_messages = json.loads(resource_part["resource"]["text"])
-    assert a2ui_messages[0]["createSurface"]["surfaceId"] == "ps_trophies"
-    assert a2ui_messages[1]["updateComponents"]["surfaceId"] == "ps_trophies"
-    assert a2ui_messages[2]["updateDataModel"]["surfaceId"] == "ps_trophies"
+    surface_id = a2ui_messages[0]["createSurface"]["surfaceId"]
+    assert surface_id.startswith("ps_trophies_")
+    assert a2ui_messages[1]["updateComponents"]["surfaceId"] == surface_id
+    assert a2ui_messages[2]["updateDataModel"]["surfaceId"] == surface_id
 
 
 def test_build_response_no_a2ui_part_without_ps_trophies_tool():

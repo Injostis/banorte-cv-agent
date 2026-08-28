@@ -237,7 +237,13 @@ arriba -- por ejemplo, una empresa, fecha, tecnología o cifra que no
 aparece ahí. NO la marques como falsa solo por resumir, interpretar,
 reordenar o parafrasear los mismos datos, ni por incluir cortesías,
 preguntas de seguimiento o comentarios conversacionales que no afirman
-nada factual nuevo.
+nada factual nuevo. Una respuesta que simplemente confirma o niega algo
+que sí aparece en los datos (ej. si domina cierta tecnología) está
+respaldada, aunque lo diga con otras palabras.
+
+Este guardrail existe para atrapar invenciones claras, no para exigir una
+coincidencia literal de palabras -- ante la duda razonable, marca
+"is_grounded" = true.
 
 Responde únicamente usando la tool proporcionada."""
 
